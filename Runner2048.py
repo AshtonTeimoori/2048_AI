@@ -3,9 +3,9 @@ import random
 import math
 # import pandas as pd
 class Game:
-    def __init__(self, seed, board_size):
+    def __init__(self, seed=None, board_size=4):
+        self.seed = seed
         random.seed(seed)
-
 
         self.board_size = board_size
         self.board = np.zeros([board_size, board_size], dtype=int)
@@ -17,6 +17,19 @@ class Game:
 
         self.setup()
 
+    def reset(self):
+
+        self.board = np.zeros([self.board_size, self.board_size], dtype=int)
+
+        self.prob_4 = 0.1   # Probability that a 4 will spawn
+
+        self.score = 0
+        self.game_over = False
+
+        self.setup()
+        
+        return self.get_flat_board()
+        
     def setup(self):
         for i in range(2):
             self.add_tile()
@@ -103,9 +116,9 @@ class Game:
             self.check_gameover()
         # else:
         #     print("No moves can be made with that swipe")
-        reward = np.log2(largest_created_val)/np.max(np.log2(self.board))
+        reward = np.log2(largest_created_val)/(np.log2(np.max(self.board)))
         if reward < 0: reward = 0
-        return (reward, self.game_over, updated)
+        return reward, self.game_over, updated
     
     def updated_rowcol(self, cur_rowcol, rev):
         #   If we are swiping to the left (moving pieces to the left) 
@@ -158,7 +171,7 @@ class Game:
     def get_flat_board(self):
         log_board = np.copy(self.board)
         log_board[self.board > 0] = np.log2(self.board[self.board > 0])
-        return log_board.flatten()/np.max(log_board)
+        return log_board.flatten()#/np.max(log_board)
 
     def check_gameover(self):
 
@@ -174,6 +187,7 @@ class Game:
         
         self.game_over = True
 
+    
 
 # def test(seed, board_size, move_list):
 #     game = Game(seed, board_size)
