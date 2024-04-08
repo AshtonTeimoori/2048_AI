@@ -1,0 +1,157 @@
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import numpy as np
+import math
+import random
+import matplotlib.pyplot as plt
+from collections import namedtuple, deque
+from Runner2048 import Game
+
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+Transition = namedtuple('Transition',
+                        ('state', 'action', 'next_state', 'reward'))
+
+
+class ReplayMemory(object):
+
+    def __init__(self, capacity):
+        self.memory = deque([], maxlen=capacity)
+
+    def push(self, *args):
+        """Save a transition"""
+        self.memory.append(Transition(*args))
+
+    def sample(self, batch_size):
+        return random.sample(self.memory, batch_size)
+
+    def __len__(self):
+        return len(self.memory)
+
+
+
+class DQN(nn.Module):
+    def __init__(self, input_size, output_size):
+        super(DQN, self).__init__()
+        self.fc1 = nn.Linear(input_size, 128)
+        self.fc2 = nn.Linear(128, 64)
+        self.fc3 = nn.Linear(64, output_size)
+
+    def forward(self, x):
+        x = torch.relu(self.fc1(x))
+        x = torch.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x
+
+
+# Create an instance of the Game class
+game = Game()
+#list of actions
+action_dict = {0:'U', 1:'R', 2:'D', 3:'L'}
+# state = game.reset()
+
+# Define hyperparameters
+input_size = 16  # Assuming the input size is 16 for the 4x4 grid of the game
+output_size = 4  # Assuming there are 4 possible actions (up, down, left, right)
+LR = 0.001
+num_episodes = 100
+GAMMA = 0.99 # Discount factor
+TAU = 0.005 # Soft update parameter
+EPS = 0.9 # Epsilon greedy parameter
+EPS_DECAY = 100 
+EPS_MIN = 0.05
+
+# Create an instance of the DQN model
+policy_net = DQN(input_size, output_size).to(device)
+target_net = DQN(input_size, output_size).to(device)
+target_net.load_state_dict(policy_net.state_dict())
+
+# Define the loss function and optimizer
+criterion = nn.SmoothL1Loss()
+optimizer = optim.AdamW(policy_net.parameters(), lr=LR, amsgrad=True)
+
+steps = 0
+
+def select_action(state):
+    sample = random.random()
+    global steps
+    eps_thresh = EPS_MIN + (EPS - EPS_MIN) * math.exp(-1 * steps / EPS_DECAY)
+    steps += 1
+    if sample > eps_thresh:
+        with torch.no_grad():
+            q_values = policy_net(state)
+            action = torch.argmax(q_values).item()
+    else:
+        action = random.choice(range(output_size))
+    return action
+
+def optimize_model(state, reward):
+    # if len(memory) < BATCH_SIZE:
+    #     return
+    state_action_values = policy_net(state)
+    next_state_values = target_net(state)
+    
+    expected_state_action_values = (next_state_values * GAMMA) + reward
+    
+    loss = criterion(state_action_values, expected_state_action_values)
+    
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+    
+    return loss.item()
+
+game_history_vect = []
+loss_vect = []
+# Training loop
+for episode in range(num_episodes):
+    state = game.reset()  # Reset the game and get the initial state
+    done = False  # Flag to indicate if the game is over
+    # Convert the state to a tensor 
+    # state = game.get_flat_board()
+    state_tensor = torch.tensor(state, dtype=torch.float32, device=device)
+    while not done:
+        # Get the Q-values from the model
+        # q_values = model(state_tensor)
+
+        # Choose an action based on the Q-values (e.g., using epsilon-greedy policy)
+        action = select_action(state_tensor)
+
+        # Take the chosen action and get the next state, reward, and done flag
+        reward, done, _ = game.swipe(action_dict[action])
+        
+        reward = torch.tensor([reward], device=device)
+        
+        if done:
+            next_state = None
+        else:
+            next_state = game.get_flat_board()
+            next_state_tensor = torch.tensor(next_state, dtype=torch.float32, device=device)
+        
+        # Store the transition in the replay memory
+        # memory.push(state, action, next_state, reward)
+        
+        
+        # Update the current state
+        state = next_state_tensor
+        
+        loss = optimize_model(state, reward)
+        
+        # Soft update of the target network's weights
+        # θ′ ← τ θ + (1 −τ )θ′
+        target_net_state_dict = target_net.state_dict()
+        policy_net_state_dict = policy_net.state_dict()
+        for key in policy_net_state_dict:
+            target_net_state_dict[key] = policy_net_state_dict[key]*TAU + target_net_state_dict[key]*(1-TAU)
+        target_net.load_state_dict(target_net_state_dict)
+        
+        # game.display()
+    
+    game_history_vect.append(np.sum(game.get_flat_board()))
+    loss_vect.append(loss)
+    print(game_history_vect[-1])
+
+plt.plot(game_history_vect)
+plt.plot(loss_vect)
