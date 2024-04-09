@@ -56,12 +56,15 @@ action_dict = {0:'U', 1:'R', 2:'D', 3:'L'}
 input_size = 16  # Assuming the input size is 16 for the 4x4 grid of the game
 output_size = 4  # Assuming there are 4 possible actions (up, down, left, right)
 LR = 0.001
-num_episodes = 100
+matches = 400
 GAMMA = 0.99 # Discount factor
 TAU = 0.005 # Soft update parameter
 EPS = 0.9 # Epsilon greedy parameter
-EPS_DECAY = 100 
+EPS_DECAY = 10000
 EPS_MIN = 0.05
+BATCH_SIZE = 128
+
+memory = ReplayMemory(10000)
 
 # Create an instance of the DQN model
 policy_net = DQN(input_size, output_size).to(device)
@@ -88,17 +91,40 @@ def select_action(state):
     return action
 
 def optimize_model(state, reward):
-    # if len(memory) < BATCH_SIZE:
-    #     return
-    state_action_values = policy_net(state)
-    next_state_values = target_net(state)
+    if len(memory) < BATCH_SIZE:
+        return
     
-    expected_state_action_values = (next_state_values * GAMMA) + reward
+    # batch the memory
+    transitions = memory.sample(BATCH_SIZE)
+    batch = Transition(*zip(*transitions))
+    
+    
+    non_final_mask = torch.tensor(tuple(map(lambda s: s is not None, batch.next_state)), device=device, dtype=torch.bool)
+    non_final_next_states = torch.stack([s for s in batch.next_state if s is not None])
+    
+    state_batch = torch.cat(batch.state).reshape(BATCH_SIZE, -1)
+    action_batch = torch.cat(batch.action).reshape(BATCH_SIZE, -1)
+    reward_batch = torch.cat(batch.reward).reshape(BATCH_SIZE, -1)
+    
+    state_action_values = policy_net(state_batch).gather(1, action_batch)
+    next_state_values = torch.zeros(BATCH_SIZE, device=device)
+    with torch.no_grad():
+        next_state_values[non_final_mask] = target_net(non_final_next_states).max(1)[0].detach()
+    
+    expected_state_action_values = (next_state_values * GAMMA) + reward_batch
+    
+    # state_action_values = policy_net(state)
+    
+    # next_state = target_net(state)
+    
+    # expected_state_action_values = (next_state * GAMMA) + reward
     
     loss = criterion(state_action_values, expected_state_action_values)
     
     optimizer.zero_grad()
     loss.backward()
+    
+    # torch.nn.utils.clip_grad_norm_(policy_net.parameters(), 100)
     optimizer.step()
     
     return loss.item()
@@ -106,7 +132,7 @@ def optimize_model(state, reward):
 game_history_vect = []
 loss_vect = []
 # Training loop
-for episode in range(num_episodes):
+for episode in range(matches):
     state = game.reset()  # Reset the game and get the initial state
     done = False  # Flag to indicate if the game is over
     # Convert the state to a tensor 
@@ -126,18 +152,20 @@ for episode in range(num_episodes):
         
         if done:
             next_state = None
+            break
         else:
             next_state = game.get_flat_board()
-            next_state_tensor = torch.tensor(next_state, dtype=torch.float32, device=device)
+            next_state = torch.tensor(next_state, dtype=torch.float32, device=device)
         
+        action = torch.tensor([action], device=device, dtype=torch.long)
         # Store the transition in the replay memory
-        # memory.push(state, action, next_state, reward)
+        memory.push(state_tensor, action, next_state, reward)
         
         
         # Update the current state
-        state = next_state_tensor
+        state_tensor = next_state
         
-        loss = optimize_model(state, reward)
+        loss = optimize_model(state_tensor, reward)
         
         # Soft update of the target network's weights
         # θ′ ← τ θ + (1 −τ )θ′
@@ -152,6 +180,9 @@ for episode in range(num_episodes):
     game_history_vect.append(np.sum(game.get_flat_board()))
     loss_vect.append(loss)
     print(game_history_vect[-1])
+    game.display()
 
 plt.plot(game_history_vect)
+plt.show()
 plt.plot(loss_vect)
+plt.show()

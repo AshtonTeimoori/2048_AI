@@ -15,10 +15,12 @@ class Game:
         self.score = 0
         self.game_over = False
 
+        self.empty_space_val = self.board_size**2
         self.setup()
 
     def reset(self):
-
+        
+        random.seed(self.seed)
         self.board = np.zeros([self.board_size, self.board_size], dtype=int)
 
         self.prob_4 = 0.1   # Probability that a 4 will spawn
@@ -26,6 +28,7 @@ class Game:
         self.score = 0
         self.game_over = False
 
+        self.empty_space_val = self.board_size**2
         self.setup()
         
         return self.get_flat_board()
@@ -117,6 +120,8 @@ class Game:
         # else:
         #     print("No moves can be made with that swipe")
         reward = np.log2(largest_created_val)/(np.log2(np.max(self.board)))
+        reward += max(0, len(self.get_avaliable_spaces()) - self.empty_space_val)/16
+        self.empty_space_val = len(self.get_avaliable_spaces())
         if reward < 0: reward = 0
         return reward, self.game_over, updated
     
@@ -194,8 +199,9 @@ class Game:
 #     game.display()
 
 #     for move in move_list:
-#         game.swipe(move)
+#         rew, _, _ = game.swipe(move)
 #         game.display()
+#         print(rew)
 
 # test(420, 4, ['R', 
 #               'U',
