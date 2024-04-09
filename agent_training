@@ -35,14 +35,16 @@ class ReplayMemory(object):
 class DQN(nn.Module):
     def __init__(self, input_size, output_size):
         super(DQN, self).__init__()
-        self.fc1 = nn.Linear(input_size, 128)
-        self.fc2 = nn.Linear(128, 64)
-        self.fc3 = nn.Linear(64, output_size)
+        self.fc1 = nn.Linear(input_size, 256)
+        self.fc2 = nn.Linear(256, 256)
+        self.fc3 = nn.Linear(256, 128)
+        self.fc4 = nn.Linear(128, output_size)
 
     def forward(self, x):
         x = torch.relu(self.fc1(x))
         x = torch.relu(self.fc2(x))
-        x = self.fc3(x)
+        x = torch.relu(self.fc3(x))
+        x = self.fc4(x)
         return x
 
 
@@ -55,13 +57,13 @@ action_dict = {0:'U', 1:'R', 2:'D', 3:'L'}
 # Define hyperparameters
 input_size = 16  # Assuming the input size is 16 for the 4x4 grid of the game
 output_size = 4  # Assuming there are 4 possible actions (up, down, left, right)
-LR = 0.001
-matches = 400
-GAMMA = 0.99 # Discount factor
+LR = 0.005
+matches = 20
+GAMMA = 0.98 # Discount factor
 TAU = 0.005 # Soft update parameter
 EPS = 0.9 # Epsilon greedy parameter
-EPS_DECAY = 10000
-EPS_MIN = 0.05
+EPS_DECAY = 5000
+EPS_MIN = 0.01
 BATCH_SIZE = 128
 
 memory = ReplayMemory(10000)
@@ -186,3 +188,19 @@ plt.plot(game_history_vect)
 plt.show()
 plt.plot(loss_vect)
 plt.show()
+
+
+game.reset()
+done = False
+while not done:
+    state = game.get_flat_board()
+    state_tensor = torch.tensor(state, dtype=torch.float32, device=device)
+    with torch.no_grad():
+            q_values = policy_net(state_tensor)
+            action = torch.argmax(q_values).item()
+    reward, done, _ = game.swipe(action_dict[action])
+    game.display()
+    print(reward)
+    # print(done)
+    # print(action_dict[action])
+    # print('---------------------')
