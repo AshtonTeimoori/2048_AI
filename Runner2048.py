@@ -15,6 +15,8 @@ class Game:
         self.score = 0
         self.game_over = False
 
+        self.game_duration = 0
+        
         self.empty_space_val = self.board_size**2
         self.setup()
 
@@ -28,6 +30,8 @@ class Game:
         self.score = 0
         self.game_over = False
 
+        self.game_duration = 0
+        
         self.empty_space_val = self.board_size**2
         self.setup()
         
@@ -82,7 +86,7 @@ class Game:
         
         updated = False
         updated_i = False
-
+        
         # # Get all non-zero pieces (mask)
         # populated = self.get_nonzero()
         rev = False
@@ -117,11 +121,26 @@ class Game:
         if updated:
             self.add_tile()
             self.check_gameover()
+            self.game_duration += 1
         # else:
         #     print("No moves can be made with that swipe")
-        reward = np.log2(largest_created_val)/(np.log2(np.max(self.board)))
-        reward += max(0, len(self.get_avaliable_spaces()) - self.empty_space_val)/16
+        
+        reward = 0
+        
+        if largest_created_val != 0:
+            # reward agent for new largest value
+            if np.log2(largest_created_val)/(np.log2(np.max(self.board))) > 0:
+                reward += 1
+        # reward = np.log2(largest_created_val)/(np.log2(np.max(self.board)))
+        
+        # reward agent for opening up spaces
+        reward += max(0, len(self.get_avaliable_spaces()) - self.empty_space_val)
         self.empty_space_val = len(self.get_avaliable_spaces())
+        
+        # punish agent for not moving
+        if not updated:
+            reward += -1
+        
         if reward < 0: reward = 0
         return reward, self.game_over, updated
     
@@ -176,7 +195,8 @@ class Game:
     def get_flat_board(self):
         log_board = np.copy(self.board)
         log_board[self.board > 0] = np.log2(self.board[self.board > 0])
-        return log_board.flatten()#/np.max(log_board)
+        return log_board.flatten()/np.log2(2048) 
+        # return log_board.flatten()/np.max(log_board)
 
     def check_gameover(self):
 

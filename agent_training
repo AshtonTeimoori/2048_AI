@@ -7,7 +7,8 @@ import random
 import matplotlib.pyplot as plt
 from collections import namedtuple, deque
 from Runner2048 import Game
-
+from model_class import DQN
+from generate_board import generate_2048_games
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -31,23 +32,6 @@ class ReplayMemory(object):
         return len(self.memory)
 
 
-
-class DQN(nn.Module):
-    def __init__(self, input_size, output_size):
-        super(DQN, self).__init__()
-        self.fc1 = nn.Linear(input_size, 256)
-        self.fc2 = nn.Linear(256, 256)
-        self.fc3 = nn.Linear(256, 128)
-        self.fc4 = nn.Linear(128, output_size)
-
-    def forward(self, x):
-        x = torch.relu(self.fc1(x))
-        x = torch.relu(self.fc2(x))
-        x = torch.relu(self.fc3(x))
-        x = self.fc4(x)
-        return x
-
-
 # Create an instance of the Game class
 game = Game()
 #list of actions
@@ -57,16 +41,16 @@ action_dict = {0:'U', 1:'R', 2:'D', 3:'L'}
 # Define hyperparameters
 input_size = 16  # Assuming the input size is 16 for the 4x4 grid of the game
 output_size = 4  # Assuming there are 4 possible actions (up, down, left, right)
-LR = 0.005
-matches = 20
-GAMMA = 0.98 # Discount factor
-TAU = 0.005 # Soft update parameter
+LR = 0.01
+matches = 1000
+GAMMA = 0.99 # Discount factor
+TAU = 0.1 # Soft update parameter
 EPS = 0.9 # Epsilon greedy parameter
-EPS_DECAY = 5000
+EPS_DECAY = 2000
 EPS_MIN = 0.01
-BATCH_SIZE = 128
+BATCH_SIZE = 512
 
-memory = ReplayMemory(10000)
+memory = ReplayMemory(8000)
 
 # Create an instance of the DQN model
 policy_net = DQN(input_size, output_size).to(device)
@@ -75,7 +59,7 @@ target_net.load_state_dict(policy_net.state_dict())
 
 # Define the loss function and optimizer
 criterion = nn.SmoothL1Loss()
-optimizer = optim.AdamW(policy_net.parameters(), lr=LR, amsgrad=True)
+optimizer = optim.AdamW(policy_net.parameters(), lr=LR, weight_decay=0.0001, amsgrad=True)
 
 steps = 0
 
@@ -93,6 +77,7 @@ def select_action(state):
     return action
 
 def optimize_model(state, reward):
+    
     if len(memory) < BATCH_SIZE:
         return
     
@@ -133,74 +118,168 @@ def optimize_model(state, reward):
 
 game_history_vect = []
 loss_vect = []
+duration_vect = []
+
+generate_maps = False
+
 # Training loop
-for episode in range(matches):
-    state = game.reset()  # Reset the game and get the initial state
-    done = False  # Flag to indicate if the game is over
-    # Convert the state to a tensor 
-    # state = game.get_flat_board()
-    state_tensor = torch.tensor(state, dtype=torch.float32, device=device)
-    while not done:
-        # Get the Q-values from the model
-        # q_values = model(state_tensor)
-
-        # Choose an action based on the Q-values (e.g., using epsilon-greedy policy)
-        action = select_action(state_tensor)
-
-        # Take the chosen action and get the next state, reward, and done flag
-        reward, done, _ = game.swipe(action_dict[action])
-        
-        reward = torch.tensor([reward], device=device)
-        
-        if done:
-            next_state = None
-            break
-        else:
-            next_state = game.get_flat_board()
-            next_state = torch.tensor(next_state, dtype=torch.float32, device=device)
-        
-        action = torch.tensor([action], device=device, dtype=torch.long)
-        # Store the transition in the replay memory
-        memory.push(state_tensor, action, next_state, reward)
-        
-        
-        # Update the current state
-        state_tensor = next_state
-        
-        loss = optimize_model(state_tensor, reward)
-        
-        # Soft update of the target network's weights
-        # θ′ ← τ θ + (1 −τ )θ′
-        target_net_state_dict = target_net.state_dict()
-        policy_net_state_dict = policy_net.state_dict()
-        for key in policy_net_state_dict:
-            target_net_state_dict[key] = policy_net_state_dict[key]*TAU + target_net_state_dict[key]*(1-TAU)
-        target_net.load_state_dict(target_net_state_dict)
-        
-        # game.display()
+if generate_maps == True:
+    # this will randomly generate a list of games to train on up to tiles of 10**10
+    # this will train on games for only the first action taken
     
-    game_history_vect.append(np.sum(game.get_flat_board()))
-    loss_vect.append(loss)
-    print(game_history_vect[-1])
-    game.display()
+    for episode in range(matches):
+        # state = game.reset()  # Reset the game and get the initial state
+        games = generate_2048_games(4, 1000)
+        for game in games:
+            # Convert the state to a tensor 
+            state = game.get_flat_board()
+            state_tensor = torch.tensor(state, dtype=torch.float32, device=device)
+            
+            # Choose an action based on the Q-values (e.g., using epsilon-greedy policy)
+            action = select_action(state_tensor)
 
-plt.plot(game_history_vect)
+            # Take the chosen action and get the next state, reward, and done flag
+            reward, done, _ = game.swipe(action_dict[action])
+                
+            reward = torch.tensor([reward], device=device)
+            
+            if done:
+                next_state = None
+                break
+            else:
+                next_state = game.get_flat_board()
+                next_state = torch.tensor(next_state, dtype=torch.float32, device=device)
+            
+            action = torch.tensor([action], device=device, dtype=torch.long)
+            # Store the transition in the replay memory
+            memory.push(state_tensor, action, next_state, reward)
+            
+            # Update the current state
+            state_tensor = next_state
+            
+            loss = optimize_model(state_tensor, reward)
+            
+            # Soft update of the target network's weights
+            # θ′ ← τ θ + (1 −τ )θ′
+            target_net_state_dict = target_net.state_dict()
+            policy_net_state_dict = policy_net.state_dict()
+            for key in policy_net_state_dict:
+                target_net_state_dict[key] = policy_net_state_dict[key]*TAU + target_net_state_dict[key]*(1-TAU)
+            target_net.load_state_dict(target_net_state_dict)
+            
+            # game.display()
+            
+            
+        duration_vect.append(game.game_duration)
+        game_history_vect.append(np.sum(game.get_flat_board()))
+        if loss is not None:
+            loss_vect.append(loss)
+        # print(duration_vect[-1])
+        print(game_history_vect[-1])
+        game.display()
+        if episode % 100 == 0:
+            print('---------------------')
+            print('Episode:', episode)
+            print('---------------------')
+            
+else:
+    # this will train on a single game from a starting board up to game end
+    # there's also a break counter to stop the game early if desired (to train on only the early game for example)
+    for episode in range(matches):
+        state = game.reset()  # Reset the game and get the initial state
+        done = False  # Flag to indicate if the game is over
+        # Convert the state to a tensor 
+        # state = game.get_flat_board()
+        state_tensor = torch.tensor(state, dtype=torch.float32, device=device)
+        
+        break_counter = 0
+        while not done:
+            # Get the Q-values from the model
+            # q_values = model(state_tensor)
+            
+            # Choose an action based on the Q-values (e.g., using epsilon-greedy policy)
+            action = select_action(state_tensor)
+
+            # Take the chosen action and get the next state, reward, and done flag
+            reward, done, _ = game.swipe(action_dict[action])
+            
+            break_counter += 1
+            # if break_counter > 80:
+            #     done = True
+                
+            reward = torch.tensor([reward], device=device)
+            
+            if done:
+                next_state = None
+                break
+            else:
+                next_state = game.get_flat_board()
+                next_state = torch.tensor(next_state, dtype=torch.float32, device=device)
+            
+            action = torch.tensor([action], device=device, dtype=torch.long)
+            # Store the transition in the replay memory
+            memory.push(state_tensor, action, next_state, reward)
+            
+            
+            # Update the current state
+            state_tensor = next_state
+            
+            loss = optimize_model(state_tensor, reward)
+            
+            # Soft update of the target network's weights
+            # θ′ ← τ θ + (1 −τ )θ′
+            target_net_state_dict = target_net.state_dict()
+            policy_net_state_dict = policy_net.state_dict()
+            for key in policy_net_state_dict:
+                target_net_state_dict[key] = policy_net_state_dict[key]*TAU + target_net_state_dict[key]*(1-TAU)
+            target_net.load_state_dict(target_net_state_dict)
+            
+            # game.display()
+        
+        duration_vect.append(game.game_duration)
+        game_history_vect.append(np.sum(game.get_flat_board()))
+        if loss is not None:
+            loss_vect.append(loss)
+        print(duration_vect[-1])
+        # print(game_history_vect[-1])
+        game.display()
+        if episode % 100 == 0:
+            print('---------------------')
+            print('Episode:', episode)
+            print('---------------------')
+
+
+torch.save(policy_net.state_dict(), '2048_dqn.pth')
+
+smooth = 100
+smoothed_duration = np.convolve(duration_vect, np.ones(smooth)/smooth, mode='valid')
+plt.plot(smoothed_duration)
 plt.show()
-plt.plot(loss_vect)
+
+smoothed_loss = np.convolve(loss_vect, np.ones(smooth)/smooth, mode='valid')
+plt.plot(smoothed_loss)
 plt.show()
+
 
 
 game.reset()
-done = False
-while not done:
-    state = game.get_flat_board()
-    state_tensor = torch.tensor(state, dtype=torch.float32, device=device)
-    with torch.no_grad():
-            q_values = policy_net(state_tensor)
-            action = torch.argmax(q_values).item()
-    reward, done, _ = game.swipe(action_dict[action])
-    game.display()
-    print(reward)
-    # print(done)
-    # print(action_dict[action])
-    # print('---------------------')
+# game.display()
+# done = False
+# break_counter = 0
+# while not done:
+#     state = game.get_flat_board()
+#     state_tensor = torch.tensor(state, dtype=torch.float32, device=device)
+#     with torch.no_grad():
+#             q_values = policy_net(state_tensor)
+#             action = torch.argmax(q_values).item()
+#     reward, done, stuck = game.swipe(action_dict[action])
+#     if not stuck:
+#         break_counter += 1
+    
+#     if break_counter > 5:
+#         done = True
+#     print(reward)
+#     game.display()
+#     # print(done)
+#     # print(action_dict[action])
+#     # print('---------------------')
