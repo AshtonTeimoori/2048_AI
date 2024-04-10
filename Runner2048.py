@@ -141,7 +141,7 @@ class Game:
         if not updated:
             reward += -1
         
-        if reward < 0: reward = 0
+        # if reward < 0: reward = 0
         return reward, self.game_over, updated
     
     def updated_rowcol(self, cur_rowcol, rev):

@@ -43,7 +43,7 @@ input_size = 16  # Assuming the input size is 16 for the 4x4 grid of the game
 output_size = 4  # Assuming there are 4 possible actions (up, down, left, right)
 LR = 0.01
 matches = 1000
-GAMMA = 0.99 # Discount factor
+GAMMA = 0.999 # Discount factor
 TAU = 0.1 # Soft update parameter
 EPS = 0.9 # Epsilon greedy parameter
 EPS_DECAY = 2000
@@ -201,7 +201,7 @@ else:
             action = select_action(state_tensor)
 
             # Take the chosen action and get the next state, reward, and done flag
-            reward, done, _ = game.swipe(action_dict[action])
+            reward, done, stuck = game.swipe(action_dict[action])
             
             break_counter += 1
             # if break_counter > 80:
@@ -209,7 +209,7 @@ else:
                 
             reward = torch.tensor([reward], device=device)
             
-            if done:
+            if done and not stuck:
                 next_state = None
                 break
             else:
@@ -255,11 +255,12 @@ smooth = 100
 smoothed_duration = np.convolve(duration_vect, np.ones(smooth)/smooth, mode='valid')
 plt.plot(smoothed_duration)
 plt.show()
+plt.savefig('figures/duration.png')
 
 smoothed_loss = np.convolve(loss_vect, np.ones(smooth)/smooth, mode='valid')
 plt.plot(smoothed_loss)
 plt.show()
-
+plt.savefig('figures/loss.png')
 
 
 game.reset()
