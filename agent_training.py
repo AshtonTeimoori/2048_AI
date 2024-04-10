@@ -42,15 +42,15 @@ action_dict = {0:'U', 1:'R', 2:'D', 3:'L'}
 input_size = 16  # Assuming the input size is 16 for the 4x4 grid of the game
 output_size = 4  # Assuming there are 4 possible actions (up, down, left, right)
 LR = 0.01
-matches = 1000
+matches = 200
 GAMMA = 0.999 # Discount factor
 TAU = 0.1 # Soft update parameter
 EPS = 0.9 # Epsilon greedy parameter
-EPS_DECAY = 2000
+EPS_DECAY = 10000
 EPS_MIN = 0.01
-BATCH_SIZE = 512
+BATCH_SIZE = 2048
 
-memory = ReplayMemory(8000)
+memory = ReplayMemory(20000)
 
 # Create an instance of the DQN model
 policy_net = DQN(input_size, output_size).to(device)
@@ -204,12 +204,12 @@ else:
             reward, done, stuck = game.swipe(action_dict[action])
             
             break_counter += 1
-            # if break_counter > 80:
-            #     done = True
+            if break_counter > 200:
+                done = True
                 
             reward = torch.tensor([reward], device=device)
             
-            if done and not stuck:
+            if done:
                 next_state = None
                 break
             else:
@@ -224,6 +224,7 @@ else:
             # Update the current state
             state_tensor = next_state
             
+            # if episode % 10 == 0:
             loss = optimize_model(state_tensor, reward)
             
             # Soft update of the target network's weights
