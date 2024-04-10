@@ -6,7 +6,7 @@ import math
 import random
 import matplotlib.pyplot as plt
 from collections import namedtuple, deque
-from Runner2048 import Game
+from src.Runner2048 import Game
 
 class DQN(nn.Module):
     def __init__(self, input_size, output_size):
