@@ -50,11 +50,13 @@ while not done:
     
     if break_counter > 5:
         done = True
-    print(reward)
-    
+        
+    print('---------------------')
     game.display()
-    print(stuck)
-    
+    print('Action: ', action_dict[action])
+    print('Reward: ', reward)
+    print('Stuck? ', not stuck)
+    print('---------------------')
     # print(done)
     # print(action_dict[action])
     # print('---------------------')

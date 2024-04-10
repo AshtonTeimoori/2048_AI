@@ -41,16 +41,16 @@ action_dict = {0:'U', 1:'R', 2:'D', 3:'L'}
 # Define hyperparameters
 input_size = 16  # Assuming the input size is 16 for the 4x4 grid of the game
 output_size = 4  # Assuming there are 4 possible actions (up, down, left, right)
-LR = 0.05
-matches = 300
-GAMMA = 0.99 # Discount factor
+LR = 0.001
+matches = 400
+GAMMA = 0.5 # Discount factor
 TAU = 0.05 # Soft update parameter
 EPS = 0.9 # Epsilon greedy parameter
-EPS_DECAY = 10000
+EPS_DECAY = 5000
 EPS_MIN = 0.01
-BATCH_SIZE = 516
+BATCH_SIZE = 512
 
-memory = ReplayMemory(20000)
+memory = ReplayMemory(10000)
 
 # Create an instance of the DQN model
 policy_net = DQN(input_size, output_size).to(device)
@@ -58,7 +58,7 @@ target_net = DQN(input_size, output_size).to(device)
 target_net.load_state_dict(policy_net.state_dict())
 
 # Define the loss function and optimizer
-criterion = nn.SmoothL1Loss()
+
 optimizer = optim.AdamW(policy_net.parameters(), lr=LR, weight_decay=0.0001, amsgrad=True)
 
 steps = 0
@@ -87,31 +87,27 @@ def optimize_model(state, reward):
     
     
     non_final_mask = torch.tensor(tuple(map(lambda s: s is not None, batch.next_state)), device=device, dtype=torch.bool)
-    non_final_next_states = torch.stack([s for s in batch.next_state if s is not None])
+    non_final_next_states = torch.stack([s for s in batch.next_state if s is not None]).to(device)
     
     state_batch = torch.cat(batch.state).reshape(BATCH_SIZE, -1)
     action_batch = torch.cat(batch.action).reshape(BATCH_SIZE, -1)
-    reward_batch = torch.cat(batch.reward).reshape(BATCH_SIZE, -1)
+    reward_batch = torch.cat(batch.reward).reshape(BATCH_SIZE, 1)
     
     state_action_values = policy_net(state_batch).gather(1, action_batch)
     next_state_values = torch.zeros(BATCH_SIZE, device=device)
     with torch.no_grad():
         next_state_values[non_final_mask] = target_net(non_final_next_states).max(1)[0].detach()
     
+    next_state_values = next_state_values.unsqueeze(1)
     expected_state_action_values = (next_state_values * GAMMA) + reward_batch
     
-    # state_action_values = policy_net(state)
-    
-    # next_state = target_net(state)
-    
-    # expected_state_action_values = (next_state * GAMMA) + reward
-    
+    criterion = nn.SmoothL1Loss()
     loss = criterion(state_action_values, expected_state_action_values)
     
     optimizer.zero_grad()
     loss.backward()
     
-    # torch.nn.utils.clip_grad_norm_(policy_net.parameters(), 100)
+    torch.nn.utils.clip_grad_norm_(policy_net.parameters(), 100)
     optimizer.step()
     
     return loss.item()
@@ -120,6 +116,8 @@ game_history_vect = []
 loss_vect = []
 duration_vect = []
 score_vect = []
+
+q_value_vect = []
 
 generate_maps = False
 
@@ -214,6 +212,11 @@ else:
             
             if done:
                 next_state = None
+                state = game.get_flat_board()
+                state_tensor = torch.tensor(state, dtype=torch.float32, device=device)
+                with torch.no_grad():
+                    q_values = policy_net(state_tensor)
+                    q_value_vect.append(q_values)
                 break
             else:
                 next_state = game.get_flat_board()
@@ -227,6 +230,8 @@ else:
             # Update the current state
             state_tensor = next_state
             
+            
+                
             # if episode % 10 == 0:
             loss = optimize_model(state_tensor, reward)
             
@@ -239,12 +244,15 @@ else:
             target_net.load_state_dict(target_net_state_dict)
             
             # game.display()
+            
+            
         
         duration_vect.append(game.game_duration)
         game_history_vect.append(np.sum(game.get_flat_board()))
         if loss is not None:
             loss_vect.append(loss)
         print(duration_vect[-1])
+        print('Q-values:', q_value_vect[-1])
         score_vect.append(game.get_score())
         # print(game_history_vect[-1])
         game.display()

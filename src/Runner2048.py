@@ -147,7 +147,14 @@ class Game:
                 
                 # punish agent for not moving
                 if not updated:
-                    reward += -1
+                    reward += -5
+        elif self.reward_type == 'only_duration':
+            reward = self.game_duration
+            
+        elif self.reward_type == 'only_steps':
+            reward = -1
+            if updated:
+                reward = 1
         else:
             raise ValueError("Invalid reward model selected")
 
@@ -204,8 +211,8 @@ class Game:
     def get_flat_board(self):
         log_board = np.copy(self.board)
         log_board[self.board > 0] = np.log2(self.board[self.board > 0])
-        # return log_board.flatten()/np.log2(2048) 
-        return log_board.flatten()/np.max(log_board)
+        return log_board.flatten()/np.log2(2048) 
+        # return log_board.flatten()/np.max(log_board)
     def check_gameover(self):
 
         for rowcol in range(self.board_size):
