@@ -6,7 +6,7 @@ import math
 import random
 import matplotlib.pyplot as plt
 from collections import namedtuple, deque
-from Runner2048 import Game
+from src.Runner2048 import Game
 from model_class import DQN
 
 # This file will be used to run the agent on the 2048 game

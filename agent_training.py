@@ -6,7 +6,7 @@ import math
 import random
 import matplotlib.pyplot as plt
 from collections import namedtuple, deque
-from Runner2048 import Game
+from src.Runner2048 import Game
 from model_class import DQN
 from generate_board import generate_2048_games
 
@@ -33,7 +33,7 @@ class ReplayMemory(object):
 
 
 # Create an instance of the Game class
-game = Game()
+game = Game(reward_type='duration_and_whitespace')
 #list of actions
 action_dict = {0:'U', 1:'R', 2:'D', 3:'L'}
 # state = game.reset()
