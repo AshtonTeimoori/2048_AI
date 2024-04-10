@@ -41,14 +41,14 @@ action_dict = {0:'U', 1:'R', 2:'D', 3:'L'}
 # Define hyperparameters
 input_size = 16  # Assuming the input size is 16 for the 4x4 grid of the game
 output_size = 4  # Assuming there are 4 possible actions (up, down, left, right)
-LR = 0.01
-matches = 200
-GAMMA = 0.999 # Discount factor
-TAU = 0.1 # Soft update parameter
+LR = 0.05
+matches = 300
+GAMMA = 0.99 # Discount factor
+TAU = 0.05 # Soft update parameter
 EPS = 0.9 # Epsilon greedy parameter
 EPS_DECAY = 10000
 EPS_MIN = 0.01
-BATCH_SIZE = 2048
+BATCH_SIZE = 516
 
 memory = ReplayMemory(20000)
 
@@ -119,6 +119,7 @@ def optimize_model(state, reward):
 game_history_vect = []
 loss_vect = []
 duration_vect = []
+score_vect = []
 
 generate_maps = False
 
@@ -203,8 +204,10 @@ else:
             # Take the chosen action and get the next state, reward, and done flag
             reward, done, stuck = game.swipe(action_dict[action])
             
-            break_counter += 1
-            if break_counter > 200:
+            if stuck:
+                break_counter += 1
+                
+            if break_counter > 100:
                 done = True
                 
             reward = torch.tensor([reward], device=device)
@@ -242,6 +245,7 @@ else:
         if loss is not None:
             loss_vect.append(loss)
         print(duration_vect[-1])
+        score_vect.append(game.get_score())
         # print(game_history_vect[-1])
         game.display()
         if episode % 100 == 0:
@@ -262,6 +266,11 @@ smoothed_loss = np.convolve(loss_vect, np.ones(smooth)/smooth, mode='valid')
 plt.plot(smoothed_loss)
 plt.show()
 plt.savefig('figures/loss.png')
+
+smoothed_score = np.convolve(score_vect, np.ones(smooth)/smooth, mode='valid')
+plt.plot(smoothed_score)
+plt.show()
+plt.savefig('figures/score.png')
 
 
 game.reset()

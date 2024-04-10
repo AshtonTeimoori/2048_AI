@@ -12,17 +12,17 @@ class DQN(nn.Module):
     def __init__(self, input_size, output_size):
         super(DQN, self).__init__()
         self.fc1 = nn.Linear(input_size, 512)
-        self.fc2 = nn.Linear(512, 1024)
-        self.fc3 = nn.Linear(1024, 1024)
-        self.fc4 = nn.Linear(1024, 512)
-        self.fc4b = nn.Linear(1024, 512)
-        self.fc5 = nn.Linear(512, output_size)
+        self.fc2 = nn.Linear(512, 512)
+        self.fc3 = nn.Linear(512, 248)
+        # self.fc4 = nn.Linear(2048, 512)
+        # self.fc4b = nn.Linear(1024, 512)
+        self.fc5 = nn.Linear(248, output_size)
         self.leaky_relu = nn.LeakyReLU(0.01)
     def forward(self, x):
         x = self.leaky_relu(self.fc1(x))
         x = self.leaky_relu(self.fc2(x))
         x = self.leaky_relu(self.fc3(x))
-        x = self.fc4(x)
+        # x = self.fc4(x)
         # x = torch.relu(self.fc4b(x))
         x = torch.relu(self.fc5(x))
         return x
