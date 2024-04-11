@@ -66,10 +66,10 @@ input_size = 16  # Assuming the input size is 16 for the 4x4 grid of the game
 output_size = 4  # Assuming there are 4 possible actions (up, down, left, right)
 LR = 0.01
 LR_DECAY = 0.01
-matches = 25
-GAMMA = 0.99 # Discount factor
+matches = 40
+GAMMA = 0.8 # Discount factor
 TAU = 0.1 # Soft update parameter
-EPS = 0.99 # Epsilon greedy parameter
+EPS = 0.9 # Epsilon greedy parameter
 EPS_DECAY = 100
 EPS_MIN = 0.1
 BATCH_SIZE = 1024
@@ -157,21 +157,23 @@ def optimize_model(memory):
     
     state_batch = torch.cat(batch.state).reshape(BATCH_SIZE, -1).to(device)
     action_batch = torch.cat(batch.action).reshape(BATCH_SIZE, -1).to(device)
-    reward_batch = torch.cat(batch.reward).reshape(BATCH_SIZE, -1).to(device)
+    reward_batch = torch.cat(batch.reward).reshape(BATCH_SIZE, 1).to(device)
     
     state_action_values = policy_net(state_batch).gather(1, action_batch)
     next_state_values = torch.zeros(BATCH_SIZE, device=device)
     with torch.no_grad():
         next_state_values[non_final_mask] = target_net(non_final_next_states).max(1)[0].detach()
     
+    next_state_values = next_state_values.unsqueeze(1)
     expected_state_action_values = (next_state_values * GAMMA) + reward_batch
     
+    criterion = nn.MSELoss()
     loss = criterion(state_action_values, expected_state_action_values)
     
     optimizer.zero_grad()
     loss.backward()
     
-    torch.nn.utils.clip_grad_norm_(policy_net.parameters(), 100)
+    # torch.nn.utils.clip_grad_norm_(policy_net.parameters(), 100)
     optimizer.step()
     
     return loss.item()
@@ -181,6 +183,8 @@ game_history_vect = []
 loss_vect = []
 duration_vect = []
 score_vect = []
+
+q_value_vect = []
 
 if __name__ == '__main__':
     memory = ReplayMemory(10000)
@@ -236,7 +240,8 @@ if __name__ == '__main__':
         if episode % 1 == 0:
             print('---------------------')
             print('Episode:', episode)
-            print('Loss:', loss)
+            # print('Q-values:', q_value_vect[-1])
+            print('Loss:', loss_vect[-1])
             print('---------------------')
     torch.save(policy_net.state_dict(), '2048_dqn.pth')
     

@@ -33,6 +33,7 @@ class ReplayMemory(object):
 
 
 # Create an instance of the Game class
+# game = Game(reward_type='no_shaping')
 game = Game(reward_type='duration_and_whitespace')
 #list of actions
 action_dict = {0:'U', 1:'R', 2:'D', 3:'L'}
@@ -41,14 +42,14 @@ action_dict = {0:'U', 1:'R', 2:'D', 3:'L'}
 # Define hyperparameters
 input_size = 16  # Assuming the input size is 16 for the 4x4 grid of the game
 output_size = 4  # Assuming there are 4 possible actions (up, down, left, right)
-LR = 0.001
-matches = 400
-GAMMA = 0.5 # Discount factor
-TAU = 0.05 # Soft update parameter
+LR = 0.01
+matches = 1000
+GAMMA = 0.8 # Discount factor
+TAU = 0.1 # Soft update parameter
 EPS = 0.9 # Epsilon greedy parameter
-EPS_DECAY = 5000
+EPS_DECAY = 20000
 EPS_MIN = 0.01
-BATCH_SIZE = 512
+BATCH_SIZE = 1024
 
 memory = ReplayMemory(10000)
 
@@ -59,14 +60,16 @@ target_net.load_state_dict(policy_net.state_dict())
 
 # Define the loss function and optimizer
 
-optimizer = optim.AdamW(policy_net.parameters(), lr=LR, weight_decay=0.0001, amsgrad=True)
+optimizer = optim.AdamW(policy_net.parameters(), lr=LR, amsgrad=False)
 
 steps = 0
-
+eps = []
 def select_action(state):
     sample = random.random()
     global steps
-    eps_thresh = EPS_MIN + (EPS - EPS_MIN) * math.exp(-1 * steps / EPS_DECAY)
+    global eps 
+    eps.append(EPS_MIN + (EPS - EPS_MIN) * math.exp(-1 * steps / EPS_DECAY))
+    eps_thresh = eps[-1]
     steps += 1
     if sample > eps_thresh:
         with torch.no_grad():
@@ -101,19 +104,21 @@ def optimize_model(state, reward):
     next_state_values = next_state_values.unsqueeze(1)
     expected_state_action_values = (next_state_values * GAMMA) + reward_batch
     
-    criterion = nn.SmoothL1Loss()
+    # criterion = nn.SmoothL1Loss()
+    criterion = nn.MSELoss()
+    
     loss = criterion(state_action_values, expected_state_action_values)
     
     optimizer.zero_grad()
     loss.backward()
     
-    torch.nn.utils.clip_grad_norm_(policy_net.parameters(), 100)
+    # torch.nn.utils.clip_grad_norm_(policy_net.parameters(), 100)
     optimizer.step()
     
     return loss.item()
 
 game_history_vect = []
-loss_vect = []
+loss_vect = [0]
 duration_vect = []
 score_vect = []
 
@@ -205,8 +210,8 @@ else:
             if stuck:
                 break_counter += 1
                 
-            if break_counter > 100:
-                done = True
+            # if break_counter > 100:
+            #     done = True
                 
             reward = torch.tensor([reward], device=device)
             
@@ -251,11 +256,15 @@ else:
         game_history_vect.append(np.sum(game.get_flat_board()))
         if loss is not None:
             loss_vect.append(loss)
+            
+        print('---------------------')
         print(duration_vect[-1])
         print('Q-values:', q_value_vect[-1])
+        print('Loss:', loss_vect[-1])
         score_vect.append(game.get_score())
         # print(game_history_vect[-1])
         game.display()
+        print('---------------------')
         if episode % 100 == 0:
             print('---------------------')
             print('Episode:', episode)
@@ -265,21 +274,27 @@ else:
 torch.save(policy_net.state_dict(), '2048_dqn.pth')
 
 smooth = 100
+fig, axs = plt.subplots(2, 2)
+
 smoothed_duration = np.convolve(duration_vect, np.ones(smooth)/smooth, mode='valid')
-plt.plot(smoothed_duration)
-plt.show()
-plt.savefig('figures/duration.png')
+axs[0, 0].plot(smoothed_duration)
+axs[0, 0].set_title('Game Duration')
 
 smoothed_loss = np.convolve(loss_vect, np.ones(smooth)/smooth, mode='valid')
-plt.plot(smoothed_loss)
-plt.show()
-plt.savefig('figures/loss.png')
+axs[0, 1].plot(smoothed_loss)
+axs[0, 1].set_title('Loss')
 
 smoothed_score = np.convolve(score_vect, np.ones(smooth)/smooth, mode='valid')
-plt.plot(smoothed_score)
-plt.show()
-plt.savefig('figures/score.png')
+axs[1, 0].plot(smoothed_score)
+axs[1, 0].set_title('Score')
 
+smoothed_eps = np.convolve(eps, np.ones(smooth)/smooth, mode='valid')
+axs[1, 1].plot(smoothed_eps)
+axs[1, 1].set_title('Epsilon')
+
+plt.tight_layout()
+plt.savefig('figures/subplots.png')
+plt.show()
 
 game.reset()
 # game.display()

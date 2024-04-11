@@ -22,7 +22,7 @@ model.load_state_dict(torch.load('2048_dqn.pth'))
 model.eval()
 
 # Create an instance of the Game class
-game = Game()
+game = Game(reward_type='duration_and_whitespace')
 #list of actions
 action_dict = {0:'U', 1:'R', 2:'D', 3:'L'}
 
@@ -48,17 +48,17 @@ while not done:
     if not stuck:
         break_counter += 1
     
-    if break_counter > 5:
+    if break_counter > 2:
         done = True
         
     print('---------------------')
-    game.display()
     print('Action: ', action_dict[action])
     print('Reward: ', reward)
     print('Stuck? ', not stuck)
+    game.display()
     print('---------------------')
     # print(done)
     # print(action_dict[action])
     # print('---------------------')
-print(game.get_score())
-print(game.game_duration)
+print('Final score: ', game.get_score())
+print('Moves: ', game.game_duration)
