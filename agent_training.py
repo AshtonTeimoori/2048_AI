@@ -33,7 +33,7 @@ class ReplayMemory(object):
 
 
 # Create an instance of the Game class
-game = Game(reward_type='duration_and_whitespace')
+game = Game(reward_type='duration_and_largest')
 #list of actions
 action_dict = {0:'U', 1:'R', 2:'D', 3:'L'}
 # state = game.reset()
@@ -235,6 +235,8 @@ else:
             target_net.load_state_dict(target_net_state_dict)
             
             # game.display()
+            if episode % 100 == 0:
+                game.display()
         
         duration_vect.append(game.game_duration)
         game_history_vect.append(np.sum(game.get_flat_board()))
@@ -242,11 +244,18 @@ else:
             loss_vect.append(loss)
         print(duration_vect[-1])
         # print(game_history_vect[-1])
-        game.display()
+        # game.display()
         if episode % 100 == 0:
             print('---------------------')
-            print('Episode:', episode)
+            # print('Episode:', episode)
+            print(f"Episode: {episode}, Reward: {reward.item()}, Duration: {game.game_duration}, Loss: {loss}")
             print('---------------------')
+            
+            print()
+            print()
+            print()
+            print()
+            print()
 
 
 torch.save(policy_net.state_dict(), '2048_dqn.pth')

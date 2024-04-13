@@ -9,6 +9,7 @@ class Game:
 
         self.board_size = board_size
         self.board = np.zeros([board_size, board_size], dtype=int)
+        self.previous_board = np.zeros([board_size, board_size], dtype=int)
 
         self.prob_4 = 0.1   # Probability that a 4 will spawn
 
@@ -21,12 +22,15 @@ class Game:
 
         self.reward_type = reward_type
 
+
         self.setup()
 
     def reset(self):
         
         random.seed(self.seed)
         self.board = np.zeros([self.board_size, self.board_size], dtype=int)
+        self.previous_board = np.zeros([self.board_size, self.board_size], dtype=int)
+
 
         self.prob_4 = 0.1   # Probability that a 4 will spawn
 
@@ -39,6 +43,23 @@ class Game:
         self.setup()
         
         return self.get_flat_board()
+
+    def load_board(self, board, game_duration):
+        self.board = board
+        self.previous_board = np.zeros([self.board_size, self.board_size], dtype=int)
+
+        self.prob_4 = 0.1   # Probability that a 4 will spawn
+
+        self.score = sum(sum(self.board)).item()
+        self.game_over = False
+
+        self.game_duration = game_duration
+        self.empty_space_val = len(self.get_avaliable_spaces())
+        
+        return self.get_flat_board()
+
+    def save_off_board(self):
+        return (self.board, self.game_duration)
 
     def setup(self):
         for i in range(2):
@@ -77,6 +98,7 @@ class Game:
     
     def display(self):
         print(self.board)
+        # self.print_csi()
 
     def swipe(self, dir):
         # Note: 
@@ -85,6 +107,7 @@ class Game:
         #   If we are swiping to the right (moving pieces to the right) 
         #       1. Start on the right side and loop through moving pieces to the right
         #       2. Check for combinations when moving the pieces to the right
+        self.previous_board = np.copy(self.board)
         largest_created_val = 0
         
         updated = False
@@ -128,10 +151,127 @@ class Game:
         # else:
         #     print("No moves can be made with that swipe")
 
-        # Best switchcase python can buy/help keep things organized
+        # Best switchcase python can buy -- help keep things organized
         if self.reward_type == 'no_shaping':
-            reward = np.log2(largest_created_val)/np.max(np.log2(self.board))
-            if reward < 0: reward = 0
+            # Just make as many moves as possible
+            if self.game_over:  # When game is over
+                reward = -10    # This doesn't make sense
+            elif updated :      # Everytime you make a step
+                reward = 0
+            else:               # Hit a wall
+                reward = -1
+
+        elif self.reward_type == 'duration_and_largest':
+            # Just make as many moves as possible
+            reward = 0
+            if updated:
+                if self.game_over:
+                    reward = 10
+                else:
+                    if largest_created_val != 0:
+                        # reward = 2*np.log2(largest_created_val)/np.max(np.log2(self.board[self.board != 0]))
+                        reward = largest_created_val
+                    reward += 1
+
+            # else:
+            #     reward = -10
+            #     self.game_over = True
+
+            # if self.game_over:  # When game is over
+                # reward = -10
+            # elif updated :      # Everytime you make a step
+            #     if largest_created_val != 0:
+            #         reward = np.log2(largest_created_val)/np.max(np.log2(self.board[self.board != 0]))
+            #     else:
+            #         reward = 0
+            # else:               # Hit a wall
+            #     reward = -10
+        elif self.reward_type == 'end_of_game_reward':
+            # Just make as many moves as possible
+            reward = 0
+            if self.game_over:
+                reward = np.max(self.board)
+
+        elif self.reward_type == 'end_of_game_and_duration_reward':
+            # Just make as many moves as possible
+            reward = 0
+            if self.game_over:
+                reward = np.max(self.board)
+            elif updated:
+                reward = 1
+            else:
+                reward = 0
+
+        elif self.reward_type == 'end_of_game_duration_and_proximity_reward':
+            # Just make as many moves as possible
+            reward = 0
+            if self.game_over:
+                reward = np.max(self.board)
+            elif updated:
+                max_loc = np.argmax(self.board)
+                if (max_loc//self.board_size != 0):                 # Check if we are on the top edge
+                    reward = max(reward, self.board[(max_loc)//self.board_size-1, (max_loc)%self.board_size])/4
+                if (max_loc//self.board_size != self.board_size-1): # Check if we are on the bottom edge
+                    reward = max(reward, self.board[(max_loc)//self.board_size+1, (max_loc)%self.board_size])/4
+                if (max_loc%self.board_size != 0):                  # Check if we are on the left edge
+                    reward = max(reward, self.board[(max_loc)//self.board_size, (max_loc)%self.board_size-1])/4
+                if (max_loc%self.board_size != self.board_size-1):  # Check if we are on the right edge
+                    reward = max(reward, self.board[(max_loc)//self.board_size, (max_loc)%self.board_size+1])/4
+                reward += largest_created_val
+            else:
+                reward = 0
+
+        elif self.reward_type == 'end_of_game_duration_and_edge_reward':
+            # Just make as many moves as possible
+            reward = 0
+            if self.game_over:
+                reward = np.max(self.board)
+            elif updated:
+                max_loc = np.argmax(self.board)
+                if (max_loc//self.board_size == 0):                 # Check if we are on the top edge
+                    reward += (np.max(self.board))/4
+                if (max_loc//self.board_size == self.board_size-1): # Check if we are on the bottom edge
+                    reward += (np.max(self.board))/4
+                if (max_loc%self.board_size == 0):                  # Check if we are on the left edge
+                    reward += (np.max(self.board))/4
+                if (max_loc%self.board_size == self.board_size-1):  # Check if we are on the right edge
+                    reward += (np.max(self.board))/4
+                reward += largest_created_val
+            else:
+                reward = 0
+
+        elif self.reward_type == 'valid_move_score_reward': 
+            # Just make as many moves as possible
+            reward = 0
+            if updated:
+                reward = self.score
+            else:
+                reward = 0
+
+        elif self.reward_type == 'end_of_game_score_reward': 
+            # Just make as many moves as possible
+            reward = 0
+            if self.game_over:
+                reward = self.score
+            else:
+                reward = 0
+
+        elif self.reward_type == 'end_of_game_duration_and_largest_reward': # Works well!
+            # Just make as many moves as possible
+            reward = 0
+            if self.game_over:
+                reward = np.max(self.board)
+            elif updated:
+                reward = largest_created_val
+            else:
+                reward = 0
+        
+        elif self.reward_type == 'large_numbers':
+            reward = 0
+            if largest_created_val != 0:
+                # reward = np.log2(largest_created_val)/np.max(np.log2(self.board[self.board != 0]))
+                reward = largest_created_val
+            # if reward < 0: reward = 0
 
         elif self.reward_type == 'duration_and_whitespace':
             reward = 0
@@ -202,10 +342,17 @@ class Game:
         # return np.sum(self.board)
 
     def get_flat_board(self):
+        # log_board = np.copy(self.board)
+        # log_board[self.board > 0] = np.log2(self.board[self.board > 0])
+        # return log_board.flatten()/np.log2(2048) 
+        # return log_board.flatten()#/np.max(log_board)
+        return self.board.flatten()#/np.max(log_board)
+    
+    def get_plump_board(self):
         log_board = np.copy(self.board)
         log_board[self.board > 0] = np.log2(self.board[self.board > 0])
         # return log_board.flatten()/np.log2(2048) 
-        return log_board.flatten()/np.max(log_board)
+        return log_board#/np.max(log_board)
     def check_gameover(self):
 
         for rowcol in range(self.board_size):
@@ -219,6 +366,22 @@ class Game:
                 if got_moves: return
         
         self.game_over = True
+
+    def print_csi(self):
+        csi_up = f"\x1B[{5}A"
+        csi_clr= "\x1B[0K"
+        
+        print(f'{csi_up}{csi_clr}')
+        for r in range( 0, len(self.board) ): 
+            print(f'{csi_clr}{self.board[r][0]}\t{self.board[r][1]}\t{self.board[r][2]}\t{self.board[r][3]}{csi_clr}')
+
+        # csi_up = f"\x1B[{5}A"
+        # csi_clr = "\x1B[2K"  # Clear entire line
+            
+        # print(f'{csi_up}{csi_clr}')
+        # for r in range(len(self.board)):
+        #     print(f'{self.board[r][0]}\t{self.board[r][1]}\t{self.board[r][2]}\t{self.board[r][3]}{csi_clr}')
+
 
 
 # def test(seed, board_size, move_list):
