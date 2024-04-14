@@ -113,43 +113,64 @@ class Game:
         updated = False
         updated_i = False
 
+        valid_move_only = False
+
+        valid_move_toggle = True
+
+        action_dict = {0:'U', 1:'R', 2:'D', 3:'L'}
+        action_dict_rev = {'U':0, 'R':1, 'D':2, 'L':3}
+
+        revised_count = 0
+
         # # Get all non-zero pieces (mask)
         # populated = self.get_nonzero()
-        rev = False
         # print(dir)
-        if (dir == 'R' or dir == 'D'):
-            rev = True
 
         # Move the piece 
         # Check direction:
-        if (dir == 'L' or dir == 'R'):
-            # 'L' (Left) or R (Right) - see if there are any empty rows
-            for row in range(self.board_size):
-                (self.board[row, :], updated_i, largest_created_val_i) = self.updated_rowcol(self.board[row, :], rev)
-                if largest_created_val_i > largest_created_val:
-                    largest_created_val = largest_created_val_i
-                if updated_i:
-                    updated = True
+        while (valid_move_toggle and not updated):
+            if (valid_move_only):
+                valid_move_toggle = False
 
-        elif(dir == 'U' or dir == 'D'):
-            # 'U' (Up) or 'D' (Down) - see if there are any empty columns
-            for col in range(self.board_size):
-                (self.board[:, col], updated_i, largest_created_val_i) = self.updated_rowcol(self.board[:, col], rev)
-                if largest_created_val_i > largest_created_val:
-                    largest_created_val = largest_created_val_i
-                if updated_i:
-                    updated = True
+            if (dir == 'R' or dir == 'D'):
+                rev = True
+            else:
+                rev = False
 
-        else:
-            print("Bad Swipe Direction")
-            exit(1)
-        
-        if updated:
-            self.add_tile()
-            self.check_gameover()
-            self.game_duration += 1
-        # else:
-        #     print("No moves can be made with that swipe")
+            if (dir == 'L' or dir == 'R'):
+                # 'L' (Left) or R (Right) - see if there are any empty rows
+                for row in range(self.board_size):
+                    (self.board[row, :], updated_i, largest_created_val_i) = self.updated_rowcol(self.board[row, :], rev)
+                    if largest_created_val_i > largest_created_val:
+                        largest_created_val = largest_created_val_i
+                    if updated_i:
+                        updated = True
+
+            elif(dir == 'U' or dir == 'D'):
+                # 'U' (Up) or 'D' (Down) - see if there are any empty columns
+                for col in range(self.board_size):
+                    (self.board[:, col], updated_i, largest_created_val_i) = self.updated_rowcol(self.board[:, col], rev)
+                    if largest_created_val_i > largest_created_val:
+                        largest_created_val = largest_created_val_i
+                    if updated_i:
+                        updated = True
+
+            else:
+                print("Bad Swipe Direction")
+                exit(1)
+
+            if updated:
+                self.add_tile()
+                self.check_gameover()
+                self.game_duration += 1
+            else:
+                action_dict_rev.pop(dir, None)
+                dir = np.random.choice(list(action_dict_rev.keys()))
+                revised_count += 1
+            # else:
+            #     print("No moves can be made with that swipe")
+
+        A = action_dict_rev[dir]
 
         # Best switchcase python can buy -- help keep things organized
         if self.reward_type == 'no_shaping':
@@ -190,7 +211,25 @@ class Game:
             # Just make as many moves as possible
             reward = 0
             if self.game_over:
-                reward = np.max(self.board)
+                reward = np.log2(np.max(self.board))
+
+        elif self.reward_type == 'end_of_game_reward_with_proximity':
+            # Just make as many moves as possible
+            reward = 0
+            if self.game_over:
+                
+                # Add the largest value around the max value
+                max_loc = np.argmax(self.board)
+                if (max_loc//self.board_size != 0):                 # Check if we are on the top edge
+                    reward = max(reward, np.log2(self.board[(max_loc)//self.board_size-1, (max_loc)%self.board_size]))
+                if (max_loc//self.board_size != self.board_size-1): # Check if we are on the bottom edge
+                    reward = max(reward, np.log2(self.board[(max_loc)//self.board_size+1, (max_loc)%self.board_size]))
+                if (max_loc%self.board_size != 0):                  # Check if we are on the left edge
+                    reward = max(reward, np.log2(self.board[(max_loc)//self.board_size, (max_loc)%self.board_size-1]))
+                if (max_loc%self.board_size != self.board_size-1):  # Check if we are on the right edge
+                    reward = max(reward, np.log2(self.board[(max_loc)//self.board_size, (max_loc)%self.board_size+1]))
+                    
+                reward += np.log2(np.max(self.board))
 
         elif self.reward_type == 'end_of_game_and_duration_reward':
             # Just make as many moves as possible
@@ -291,7 +330,7 @@ class Game:
         else:
             raise ValueError("Invalid reward model selected")
 
-        return (reward, self.game_over, updated)
+        return (reward, self.game_over, updated, A, revised_count)
     
     def updated_rowcol(self, cur_rowcol, rev):
         #   If we are swiping to the left (moving pieces to the left) 
