@@ -18,7 +18,7 @@ input_size = 16  # Assuming the input size is 16 for the 4x4 grid of the game
 output_size = 4  # Assuming there are 4 possible actions (up, down, left, right)
 model = DQN(input_size, output_size).to(device)
 
-model.load_state_dict(torch.load('trained_models\duration_and_whitespace_target_policy_weights_episode_0600.pth'))
+model.load_state_dict(torch.load('trained_models\duration_and_whitespace_target_policy_weights_episode_0400.pth'))
 model.eval()
 
 # Create an instance of the Game class
@@ -41,22 +41,25 @@ while not done:
     with torch.no_grad():
             q_values = model(state_tensor)
             action = torch.argmax(q_values).item()
-    # if break_counter > 5:
+    # if break_counter > 2:
     #     action = random.choice(range(output_size))
     
     reward, done, stuck, A, _ = game.swipe(action_dict[action])
     if not stuck:
         break_counter += 1
     
-    if break_counter > 5:
+    if break_counter > 2:
         done = True
-    print(reward)
-    
+        
+    print('---------------------')
+    print('Action: ', action_dict[action])
+    print('Reward: ', reward)
+    print('Stuck? ', not stuck)
+    print('Q-values: ', q_values)
     game.display()
-    print(stuck)
-    
+    print('---------------------')
     # print(done)
-    print(action_dict[action])
+    # print(action_dict[action])
     # print('---------------------')
-print(game.get_score())
-print(game.game_duration)
+print('Final score: ', game.get_score())
+print('Moves: ', game.game_duration)

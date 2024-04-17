@@ -172,6 +172,38 @@ class Game:
 
         A = action_dict_rev[dir]
 
+        invalid_next_actions = []
+        action_num = 0
+        board_check_master = np.copy(self.board)
+        # determine valid moves for next step
+        if updated:
+            for key, action in action_dict.items():
+                board_check = np.copy(board_check_master)
+                updated_loop = []
+                if (action == 'R' or action == 'D'):
+                    rev = True
+                else:
+                    rev = False
+                if (action == 'L' or action == 'R'):
+                # 'L' (Left) or R (Right) - see if there are any empty rows
+                    for row in range(self.board_size):
+                        (board_check[row, :], updated_i, largest_created_val_i) = self.updated_rowcol(board_check[row, :], rev)
+                        # if largest_created_val_i > largest_created_val:
+                        #     largest_created_val = largest_created_val_i
+                        updated_loop.append(updated_i)
+
+                elif(action == 'U' or action == 'D'):
+                    # 'U' (Up) or 'D' (Down) - see if there are any empty columns
+                    for col in range(self.board_size):
+                        (board_check[:, col], updated_i, largest_created_val_i) = self.updated_rowcol(board_check[:, col], rev)
+                        # if largest_created_val_i > largest_created_val:
+                        #     largest_created_val = largest_created_val_i
+                        updated_loop.append(updated_i)
+                        
+                if not any(updated_loop):
+                    invalid_next_actions.append(action_num)
+                action_num += 1
+                
         # Best switchcase python can buy -- help keep things organized
         if self.reward_type == 'no_shaping':
             # Just make as many moves as possible
@@ -330,7 +362,7 @@ class Game:
         else:
             raise ValueError("Invalid reward model selected")
 
-        return (reward, self.game_over, updated, A, revised_count)
+        return (reward, self.game_over, updated, A, revised_count, invalid_next_actions)
     
     def updated_rowcol(self, cur_rowcol, rev):
         #   If we are swiping to the left (moving pieces to the left) 
