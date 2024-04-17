@@ -211,7 +211,7 @@ class Game:
     def get_flat_board(self):
         log_board = np.copy(self.board)
         log_board[self.board > 0] = np.log2(self.board[self.board > 0])
-        return log_board.flatten()/np.log2(2048) 
+        return log_board.flatten()#/np.log2(2048) 
         # return log_board.flatten()/np.max(log_board)
     def check_gameover(self):
 

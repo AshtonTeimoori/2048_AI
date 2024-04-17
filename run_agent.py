@@ -41,15 +41,16 @@ while not done:
     with torch.no_grad():
             q_values = model(state_tensor)
             action = torch.argmax(q_values).item()
-    # if break_counter > 5:
-    #     action = random.choice(range(output_size))
+    if break_counter > 2:
+        break_counter = 0
+        action = random.choice(range(output_size))
     
     reward, done, stuck = game.swipe(action_dict[action])
     if not stuck:
         break_counter += 1
     
-    if break_counter > 2:
-        done = True
+    # if break_counter > 2:
+    #     done = True
         
     print('---------------------')
     print('Action: ', action_dict[action])
