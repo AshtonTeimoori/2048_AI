@@ -317,11 +317,11 @@ class Game:
             if largest_created_val != 0:
             # reward agent for new largest value
                 if np.log2(largest_created_val)/(np.log2(np.max(self.board))) > 0:
-                    reward += 1
+                    reward += 2
                 # reward = np.log2(largest_created_val)/(np.log2(np.max(self.board)))
                 
                 # reward agent for opening up spaces
-                reward += max(0, len(self.get_avaliable_spaces()) - self.empty_space_val)
+                reward += max(0, len(self.get_avaliable_spaces()) - self.empty_space_val)*2
                 self.empty_space_val = len(self.get_avaliable_spaces())
                 
                 # punish agent for not moving
