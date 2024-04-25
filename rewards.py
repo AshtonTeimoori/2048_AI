@@ -13,6 +13,40 @@ def reward_selection(self, updated, largest_created_val):
             else:               # Hit a wall
                 reward = -1
 
+        elif self.reward_type == 'hs':
+            # 1. The largest tile on the board
+            # 2. The value of the marges made in the last move
+            # 3. The number of empty cells on the board
+            # 4. The number of adjacent cells that are equal
+            
+            reward = 0
+
+            # 1. The largest tile on the board
+            reward += np.max(self.board)
+
+            # 2. The value of the marges made in the last move
+            reward += self.created_val
+
+            # 3. The number of empty cells on the board
+            reward += len(self.get_avaliable_spaces())*50
+
+            # 4. The number of adjacent cells that are equal
+            adjacent_sf = 100
+            for i in range(self.board_size):
+                for j in range(self.board_size):
+                    # Check if the cell above is equal
+                    if i != 0 and self.board[i][j] == self.board[i-1][j]:
+                        reward += adjacent_sf
+                    # Check if the cell below is equal
+                    if i != self.board_size-1 and self.board[i][j] == self.board[i+1][j]:
+                        reward += adjacent_sf
+                    # Check if the cell to the left is equal
+                    if j != 0 and self.board[i][j] == self.board[i][j-1]:
+                        reward += adjacent_sf
+                    # Check if the cell to the right is equal
+                    if j != self.board_size-1 and self.board[i][j] == self.board[i][j+1]:
+                        reward += adjacent_sf
+
         elif self.reward_type == 'duration_and_largest':
             # Just make as many moves as possible
             reward = 0

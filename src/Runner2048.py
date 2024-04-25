@@ -257,16 +257,17 @@ class Game:
         log_board = np.copy(self.board)
         log_board[self.board > 0] = np.log2(self.board[self.board > 0])
         # return log_board.flatten()/np.log2(2048) 
-        return log_board.flatten()/np.max(log_board)
+        # return log_board.flatten()/np.max(log_board)
+        return log_board.flatten()/16
         # return self.board.flatten()#/np.max(log_board)
     
     def get_plump_board(self):
         log_board = np.copy(self.board)
         log_board[self.board > 0] = np.log2(self.board[self.board > 0])
         # return log_board.flatten()/np.log2(2048) 
-        return log_board#/np.max(log_board)
+        return log_board/16
+    
     def check_gameover(self):
-
         for rowcol in range(self.board_size):
                 (_, got_moves, _) = self.updated_rowcol(self.board[:, rowcol], False, True)
                 if got_moves: return
