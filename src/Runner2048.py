@@ -258,7 +258,8 @@ class Game:
         log_board[self.board > 0] = np.log2(self.board[self.board > 0])
         # return log_board.flatten()/np.log2(2048) 
         # return log_board.flatten()/np.max(log_board)
-        return log_board.flatten()/16
+        # return log_board.flatten()/16
+        return log_board.flatten()
         # return self.board.flatten()#/np.max(log_board)
     
     def get_plump_board(self):
