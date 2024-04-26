@@ -27,7 +27,7 @@ class Game:
 
     def reset(self):
         
-        random.seed(self.seed)
+        random.seed(random.randrange(2**63-1))
         self.board = np.zeros([self.board_size, self.board_size], dtype=int)
         self.previous_board = np.zeros([self.board_size, self.board_size], dtype=int)
 
@@ -136,11 +136,14 @@ class Game:
                 rev = True
             else:
                 rev = False
-
+                
+            total_new_vals = 0
+            
             if (dir == 'L' or dir == 'R'):
                 # 'L' (Left) or R (Right) - see if there are any empty rows
                 for row in range(self.board_size):
-                    (self.board[row, :], updated_i, largest_created_val_i) = self.updated_rowcol(self.board[row, :], rev)
+                    (self.board[row, :], updated_i, largest_created_val_i, total_new_vals_i) = self.updated_rowcol(self.board[row, :], rev)
+                    total_new_vals += total_new_vals_i
                     if largest_created_val_i > largest_created_val:
                         largest_created_val = largest_created_val_i
                     if updated_i:
@@ -149,7 +152,8 @@ class Game:
             elif(dir == 'U' or dir == 'D'):
                 # 'U' (Up) or 'D' (Down) - see if there are any empty columns
                 for col in range(self.board_size):
-                    (self.board[:, col], updated_i, largest_created_val_i) = self.updated_rowcol(self.board[:, col], rev)
+                    (self.board[:, col], updated_i, largest_created_val_i, total_new_vals_i) = self.updated_rowcol(self.board[:, col], rev)
+                    total_new_vals += total_new_vals_i
                     if largest_created_val_i > largest_created_val:
                         largest_created_val = largest_created_val_i
                     if updated_i:
@@ -187,7 +191,7 @@ class Game:
                 if (action == 'L' or action == 'R'):
                 # 'L' (Left) or R (Right) - see if there are any empty rows
                     for row in range(self.board_size):
-                        (board_check[row, :], updated_i, largest_created_val_i) = self.updated_rowcol(board_check[row, :], rev)
+                        (board_check[row, :], updated_i, _, _) = self.updated_rowcol(board_check[row, :], rev)
                         # if largest_created_val_i > largest_created_val:
                         #     largest_created_val = largest_created_val_i
                         updated_loop.append(updated_i)
@@ -195,7 +199,7 @@ class Game:
                 elif(action == 'U' or action == 'D'):
                     # 'U' (Up) or 'D' (Down) - see if there are any empty columns
                     for col in range(self.board_size):
-                        (board_check[:, col], updated_i, largest_created_val_i) = self.updated_rowcol(board_check[:, col], rev)
+                        (board_check[:, col], updated_i, _, _) = self.updated_rowcol(board_check[:, col], rev)
                         # if largest_created_val_i > largest_created_val:
                         #     largest_created_val = largest_created_val_i
                         updated_loop.append(updated_i)
@@ -210,10 +214,13 @@ class Game:
             if self.game_over:  # When game is over
                 reward = -10    # This doesn't make sense
             elif updated :      # Everytime you make a step
-                reward = 0
+                reward = 1
             else:               # Hit a wall
                 reward = -1
 
+        elif self.reward_type == 'new_values':
+            reward = total_new_vals
+            
         elif self.reward_type == 'duration_and_largest':
             # Just make as many moves as possible
             reward = 0
@@ -370,7 +377,8 @@ class Game:
         #       2. Check for combinations when moving the pieces to the left
         updated = False
         largest_created_val = 0
-
+        total_new_vals = 0
+        
         new_rowcol = np.zeros(self.board_size, dtype=int)
 
         if rev:
@@ -394,6 +402,7 @@ class Game:
                     self.score += new_rowcol[new_index]
                     if new_rowcol[new_index] > largest_created_val:
                         largest_created_val = new_rowcol[new_index]
+                    total_new_vals += new_rowcol[new_index]
                 else:
                     # New value to put down 
                     new_rowcol[new_index] = cur_rowcol[i]
@@ -406,7 +415,7 @@ class Game:
         if (rev):
             new_rowcol = np.flip(new_rowcol)
 
-        return (new_rowcol, updated, largest_created_val)
+        return (new_rowcol, updated, largest_created_val, total_new_vals)
 
     def get_score(self):
         return self.score
@@ -427,13 +436,13 @@ class Game:
     def check_gameover(self):
 
         for rowcol in range(self.board_size):
-                (_, got_moves, _) = self.updated_rowcol(self.board[:, rowcol], False)
+                (_, got_moves, _, _) = self.updated_rowcol(self.board[:, rowcol], False)
                 if got_moves: return
-                (_, got_moves, _) = self.updated_rowcol(self.board[:, rowcol], True)
+                (_, got_moves, _, _) = self.updated_rowcol(self.board[:, rowcol], True)
                 if got_moves: return
-                (_, got_moves, _) = self.updated_rowcol(self.board[rowcol, :], False)
+                (_, got_moves, _, _) = self.updated_rowcol(self.board[rowcol, :], False)
                 if got_moves: return
-                (_, got_moves, _) = self.updated_rowcol(self.board[rowcol, :], True)
+                (_, got_moves, _, _) = self.updated_rowcol(self.board[rowcol, :], True)
                 if got_moves: return
         
         self.game_over = True
