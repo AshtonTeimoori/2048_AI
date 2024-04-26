@@ -1,11 +1,13 @@
 import numpy as np
 import random
 import math
+from rewards import reward_selection
 # import pandas as pd
 class Game:
     def __init__(self, seed=None, board_size=4, reward_type='no_shaping'):
         self.seed = seed
         random.seed(seed)
+        self.largest_value = 0
 
         self.board_size = board_size
         self.board = np.zeros([board_size, board_size], dtype=int)
@@ -22,14 +24,18 @@ class Game:
 
         self.reward_type = reward_type
 
+        self.created_val = 0
+
 
         self.setup()
 
     def reset(self):
         
+        # random.seed(self.seed)
         random.seed(random.randrange(2**63-1))
         self.board = np.zeros([self.board_size, self.board_size], dtype=int)
         self.previous_board = np.zeros([self.board_size, self.board_size], dtype=int)
+        self.largest_value = 0
 
 
         self.prob_4 = 0.1   # Probability that a 4 will spawn
@@ -41,6 +47,7 @@ class Game:
         
         self.empty_space_val = self.board_size**2
         self.setup()
+        self.created_val = 0
         
         return self.get_flat_board()
 
@@ -120,265 +127,89 @@ class Game:
         action_dict = {0:'U', 1:'R', 2:'D', 3:'L'}
         action_dict_rev = {'U':0, 'R':1, 'D':2, 'L':3}
 
-        revised_count = 0
+        invalid_moves_made = 0
 
-        # # Get all non-zero pieces (mask)
-        # populated = self.get_nonzero()
-        # print(dir)
+        self.created_val = 0
 
         # Move the piece 
         # Check direction:
-        while (valid_move_toggle and not updated):
-            if (valid_move_only):
-                valid_move_toggle = False
 
-            if (dir == 'R' or dir == 'D'):
-                rev = True
-            else:
-                rev = False
-                
-            total_new_vals = 0
-            
-            if (dir == 'L' or dir == 'R'):
-                # 'L' (Left) or R (Right) - see if there are any empty rows
-                for row in range(self.board_size):
-                    (self.board[row, :], updated_i, largest_created_val_i, total_new_vals_i) = self.updated_rowcol(self.board[row, :], rev)
-                    total_new_vals += total_new_vals_i
-                    if largest_created_val_i > largest_created_val:
-                        largest_created_val = largest_created_val_i
-                    if updated_i:
-                        updated = True
-
-            elif(dir == 'U' or dir == 'D'):
-                # 'U' (Up) or 'D' (Down) - see if there are any empty columns
-                for col in range(self.board_size):
-                    (self.board[:, col], updated_i, largest_created_val_i, total_new_vals_i) = self.updated_rowcol(self.board[:, col], rev)
-                    total_new_vals += total_new_vals_i
-                    if largest_created_val_i > largest_created_val:
-                        largest_created_val = largest_created_val_i
-                    if updated_i:
-                        updated = True
-
-            else:
-                print("Bad Swipe Direction")
-                exit(1)
-
-            if updated:
-                self.add_tile()
-                self.check_gameover()
-                self.game_duration += 1
-            else:
-                action_dict_rev.pop(dir, None)
-                dir = np.random.choice(list(action_dict_rev.keys()))
-                revised_count += 1
-            # else:
-            #     print("No moves can be made with that swipe")
-
-        A = action_dict_rev[dir]
-
-        invalid_next_actions = []
-        action_num = 0
-        board_check_master = np.copy(self.board)
-        # determine valid moves for next step
-        if updated:
-            for key, action in action_dict.items():
-                board_check = np.copy(board_check_master)
-                updated_loop = []
-                if (action == 'R' or action == 'D'):
-                    rev = True
-                else:
-                    rev = False
-                if (action == 'L' or action == 'R'):
-                # 'L' (Left) or R (Right) - see if there are any empty rows
-                    for row in range(self.board_size):
-                        (board_check[row, :], updated_i, _, _) = self.updated_rowcol(board_check[row, :], rev)
-                        # if largest_created_val_i > largest_created_val:
-                        #     largest_created_val = largest_created_val_i
-                        updated_loop.append(updated_i)
-
-                elif(action == 'U' or action == 'D'):
-                    # 'U' (Up) or 'D' (Down) - see if there are any empty columns
-                    for col in range(self.board_size):
-                        (board_check[:, col], updated_i, _, _) = self.updated_rowcol(board_check[:, col], rev)
-                        # if largest_created_val_i > largest_created_val:
-                        #     largest_created_val = largest_created_val_i
-                        updated_loop.append(updated_i)
-                        
-                if not any(updated_loop):
-                    invalid_next_actions.append(action_num)
-                action_num += 1
-                
-        # Best switchcase python can buy -- help keep things organized
-        if self.reward_type == 'no_shaping':
-            # Just make as many moves as possible
-            if self.game_over:  # When game is over
-                reward = -10    # This doesn't make sense
-            elif updated :      # Everytime you make a step
-                reward = 1
-            else:               # Hit a wall
-                reward = -1
-
-        elif self.reward_type == 'new_values':
-            reward = total_new_vals
-            
-        elif self.reward_type == 'duration_and_largest':
-            # Just make as many moves as possible
-            reward = 0
-            if updated:
-                if self.game_over:
-                    reward = 10
-                else:
-                    if largest_created_val != 0:
-                        # reward = 2*np.log2(largest_created_val)/np.max(np.log2(self.board[self.board != 0]))
-                        reward = largest_created_val
-                    reward += 1
-
-            # else:
-            #     reward = -10
-            #     self.game_over = True
-
-            # if self.game_over:  # When game is over
-                # reward = -10
-            # elif updated :      # Everytime you make a step
-            #     if largest_created_val != 0:
-            #         reward = np.log2(largest_created_val)/np.max(np.log2(self.board[self.board != 0]))
-            #     else:
-            #         reward = 0
-            # else:               # Hit a wall
-            #     reward = -10
-        elif self.reward_type == 'end_of_game_reward':
-            # Just make as many moves as possible
-            reward = 0
-            if self.game_over:
-                reward = np.log2(np.max(self.board))
-
-        elif self.reward_type == 'end_of_game_reward_with_proximity':
-            # Just make as many moves as possible
-            reward = 0
-            if self.game_over:
-                
-                # Add the largest value around the max value
-                max_loc = np.argmax(self.board)
-                if (max_loc//self.board_size != 0):                 # Check if we are on the top edge
-                    reward = max(reward, np.log2(self.board[(max_loc)//self.board_size-1, (max_loc)%self.board_size]))
-                if (max_loc//self.board_size != self.board_size-1): # Check if we are on the bottom edge
-                    reward = max(reward, np.log2(self.board[(max_loc)//self.board_size+1, (max_loc)%self.board_size]))
-                if (max_loc%self.board_size != 0):                  # Check if we are on the left edge
-                    reward = max(reward, np.log2(self.board[(max_loc)//self.board_size, (max_loc)%self.board_size-1]))
-                if (max_loc%self.board_size != self.board_size-1):  # Check if we are on the right edge
-                    reward = max(reward, np.log2(self.board[(max_loc)//self.board_size, (max_loc)%self.board_size+1]))
-                    
-                reward += np.log2(np.max(self.board))
-
-        elif self.reward_type == 'end_of_game_and_duration_reward':
-            # Just make as many moves as possible
-            reward = 0
-            if self.game_over:
-                reward = np.max(self.board)
-            elif updated:
-                reward = 1
-            else:
-                reward = 0
-
-        elif self.reward_type == 'end_of_game_duration_and_proximity_reward':
-            # Just make as many moves as possible
-            reward = 0
-            if self.game_over:
-                reward = np.max(self.board)
-            elif updated:
-                max_loc = np.argmax(self.board)
-                if (max_loc//self.board_size != 0):                 # Check if we are on the top edge
-                    reward = max(reward, self.board[(max_loc)//self.board_size-1, (max_loc)%self.board_size])/4
-                if (max_loc//self.board_size != self.board_size-1): # Check if we are on the bottom edge
-                    reward = max(reward, self.board[(max_loc)//self.board_size+1, (max_loc)%self.board_size])/4
-                if (max_loc%self.board_size != 0):                  # Check if we are on the left edge
-                    reward = max(reward, self.board[(max_loc)//self.board_size, (max_loc)%self.board_size-1])/4
-                if (max_loc%self.board_size != self.board_size-1):  # Check if we are on the right edge
-                    reward = max(reward, self.board[(max_loc)//self.board_size, (max_loc)%self.board_size+1])/4
-                reward += largest_created_val
-            else:
-                reward = 0
-
-        elif self.reward_type == 'end_of_game_duration_and_edge_reward':
-            # Just make as many moves as possible
-            reward = 0
-            if self.game_over:
-                reward = np.max(self.board)
-            elif updated:
-                max_loc = np.argmax(self.board)
-                if (max_loc//self.board_size == 0):                 # Check if we are on the top edge
-                    reward += (np.max(self.board))/4
-                if (max_loc//self.board_size == self.board_size-1): # Check if we are on the bottom edge
-                    reward += (np.max(self.board))/4
-                if (max_loc%self.board_size == 0):                  # Check if we are on the left edge
-                    reward += (np.max(self.board))/4
-                if (max_loc%self.board_size == self.board_size-1):  # Check if we are on the right edge
-                    reward += (np.max(self.board))/4
-                reward += largest_created_val
-            else:
-                reward = 0
-
-        elif self.reward_type == 'valid_move_score_reward': 
-            # Just make as many moves as possible
-            reward = 0
-            if updated:
-                reward = self.score
-            else:
-                reward = 0
-
-        elif self.reward_type == 'end_of_game_score_reward': 
-            # Just make as many moves as possible
-            reward = 0
-            if self.game_over:
-                reward = self.score
-            else:
-                reward = 0
-
-        elif self.reward_type == 'end_of_game_duration_and_largest_reward': # Works well!
-            # Just make as many moves as possible
-            reward = 0
-            if self.game_over:
-                reward = np.max(self.board)
-            elif updated:
-                reward = largest_created_val
-            else:
-                reward = 0
-        
-        elif self.reward_type == 'large_numbers':
-            reward = 0
-            if largest_created_val != 0:
-                # reward = np.log2(largest_created_val)/np.max(np.log2(self.board[self.board != 0]))
-                reward = largest_created_val
-            # if reward < 0: reward = 0
-
-        elif self.reward_type == 'duration_and_whitespace':
-            reward = 0
-            if largest_created_val != 0:
-            # reward agent for new largest value
-                if np.log2(largest_created_val)/(np.log2(np.max(self.board))) > 0:
-                    reward += 2
-                # reward = np.log2(largest_created_val)/(np.log2(np.max(self.board)))
-                
-                # reward agent for opening up spaces
-                reward += max(0, len(self.get_avaliable_spaces()) - self.empty_space_val)*2
-                self.empty_space_val = len(self.get_avaliable_spaces())
-                
-                # punish agent for not moving
-                if not updated:
-                    reward += -1
+        if (dir == 'R' or dir == 'D'):
+            rev = True
         else:
-            raise ValueError("Invalid reward model selected")
+            rev = False
 
-        return (reward, self.game_over, updated, A, revised_count, invalid_next_actions)
+        if (dir == 'L' or dir == 'R'):
+            # 'L' (Left) or R (Right) - see if there are any empty rows
+            for row in range(self.board_size):
+                (self.board[row, :], updated_i, largest_created_val_i) = self.updated_rowcol(self.board[row, :], rev)
+                if largest_created_val_i > largest_created_val:
+                    largest_created_val = largest_created_val_i
+                if updated_i:
+                    updated = True
+
+        elif(dir == 'U' or dir == 'D'):
+            # 'U' (Up) or 'D' (Down) - see if there are any empty columns
+            for col in range(self.board_size):
+                (self.board[:, col], updated_i, largest_created_val_i) = self.updated_rowcol(self.board[:, col], rev)
+                if largest_created_val_i > largest_created_val:
+                    largest_created_val = largest_created_val_i
+                if updated_i:
+                    updated = True
+
+        else:
+            print("Bad Swipe Direction")
+            exit(1)
+
+        if updated:
+            self.add_tile()
+            self.check_gameover()
+            self.game_duration += 1
+            self.largest_value = max(self.largest_value, np.max(self.board))
+        else:
+            invalid_moves_made += 1
+
+        # Create an array of invalid moves
+        update_L = False
+        update_R = False
+        update_U = False
+        update_D = False
+
+        invalid_moves = []
+        for rowcol in range(self.board_size):
+            # Check if we can move right
+            (_, updated_i, _) = self.updated_rowcol(self.board[rowcol, :], True, True)
+            update_R = update_R or updated_i
+            # Check if we can move left
+            (_, updated_i, _) = self.updated_rowcol(self.board[rowcol, :], False, True)
+            update_L = update_L or updated_i
+            # Check if we can move down
+            (_, updated_i, _) = self.updated_rowcol(self.board[:, rowcol], True, True)
+            update_D = update_D or updated_i
+            # Check if we can move up
+            (_, updated_i, _) = self.updated_rowcol(self.board[:, rowcol], False, True)
+            update_U = update_U or updated_i
+        
+        if not update_L:
+            invalid_moves.append(action_dict_rev['L'])
+        if not update_R:
+            invalid_moves.append(action_dict_rev['R'])
+        if not update_U:
+            invalid_moves.append(action_dict_rev['U'])
+        if not update_D:
+            invalid_moves.append(action_dict_rev['D'])
+
+        reward = reward_selection(self, updated, largest_created_val)
+
+        return (reward, self.game_over, updated, invalid_moves, invalid_moves_made)
     
-    def updated_rowcol(self, cur_rowcol, rev):
+    def updated_rowcol(self, cur_rowcol, rev, check_only=False):
         #   If we are swiping to the left (moving pieces to the left) 
         #       1. Start on the left side and loop through moving pieces to the left
         #       2. Check for combinations when moving the pieces to the left
         updated = False
         largest_created_val = 0
-        total_new_vals = 0
-        
+
         new_rowcol = np.zeros(self.board_size, dtype=int)
 
         if rev:
@@ -402,7 +233,8 @@ class Game:
                     self.score += new_rowcol[new_index]
                     if new_rowcol[new_index] > largest_created_val:
                         largest_created_val = new_rowcol[new_index]
-                    total_new_vals += new_rowcol[new_index]
+                    if not check_only:
+                        self.created_val += new_rowcol[new_index]
                 else:
                     # New value to put down 
                     new_rowcol[new_index] = cur_rowcol[i]
@@ -415,34 +247,36 @@ class Game:
         if (rev):
             new_rowcol = np.flip(new_rowcol)
 
-        return (new_rowcol, updated, largest_created_val, total_new_vals)
+        return (new_rowcol, updated, largest_created_val)
 
     def get_score(self):
         return self.score
         # return np.sum(self.board)
 
     def get_flat_board(self):
-        # log_board = np.copy(self.board)
-        # log_board[self.board > 0] = np.log2(self.board[self.board > 0])
+        log_board = np.copy(self.board)
+        log_board[self.board > 0] = np.log2(self.board[self.board > 0])
         # return log_board.flatten()/np.log2(2048) 
-        # return log_board.flatten()#/np.max(log_board)
-        return self.board.flatten()#/np.max(log_board)
+        # return log_board.flatten()/np.max(log_board)
+        # return log_board.flatten()/16
+        return log_board.flatten()
+        # return self.board.flatten()#/np.max(log_board)
     
     def get_plump_board(self):
         log_board = np.copy(self.board)
         log_board[self.board > 0] = np.log2(self.board[self.board > 0])
         # return log_board.flatten()/np.log2(2048) 
-        return log_board#/np.max(log_board)
+        return log_board/16
+    
     def check_gameover(self):
-
         for rowcol in range(self.board_size):
-                (_, got_moves, _, _) = self.updated_rowcol(self.board[:, rowcol], False)
+                (_, got_moves, _) = self.updated_rowcol(self.board[:, rowcol], False, True)
                 if got_moves: return
-                (_, got_moves, _, _) = self.updated_rowcol(self.board[:, rowcol], True)
+                (_, got_moves, _) = self.updated_rowcol(self.board[:, rowcol], True, True)
                 if got_moves: return
-                (_, got_moves, _, _) = self.updated_rowcol(self.board[rowcol, :], False)
+                (_, got_moves, _) = self.updated_rowcol(self.board[rowcol, :], False, True)
                 if got_moves: return
-                (_, got_moves, _, _) = self.updated_rowcol(self.board[rowcol, :], True)
+                (_, got_moves, _) = self.updated_rowcol(self.board[rowcol, :], True, True)
                 if got_moves: return
         
         self.game_over = True
