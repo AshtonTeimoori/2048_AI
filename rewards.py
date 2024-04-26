@@ -47,6 +47,84 @@ def reward_selection(self, updated, largest_created_val):
                     if j != self.board_size-1 and self.board[i][j] == self.board[i][j+1]:
                         reward += adjacent_sf
 
+        elif self.reward_type == 'hs_corner':
+            # 1. The largest tile on the board
+            # 2. The value of the marges made in the last move
+            # 3. The number of empty cells on the board
+            # 4. The number of adjacent cells that are equal
+            # 5. If the largest tile is on the edge of the board, double for the corner
+            
+            reward = 0
+
+            # # 1. The largest tile on the board
+            # reward += np.max(self.board)
+
+            # # 2. The value of the marges made in the last move
+            # reward += self.created_val
+            reward += self.created_val_count*100
+
+            # # 3. The number of empty cells on the board
+            # reward += len(self.get_avaliable_spaces())*50
+
+            # 4. The number of adjacent cells that are equal
+            adjacent_sf = 50
+            for i in range(self.board_size):
+                for j in range(self.board_size):
+                    # Check if the cell above is equal
+                    if i != 0 and self.board[i][j] == self.board[i-1][j]:
+                        # reward += self.board[i][j]/3
+                        reward += adjacent_sf
+                    # Check if the cell below is equal
+                    if i != self.board_size-1 and self.board[i][j] == self.board[i+1][j]:
+                        # reward += self.board[i][j]/3
+                        reward += adjacent_sf
+                    # Check if the cell to the left is equal
+                    if j != 0 and self.board[i][j] == self.board[i][j-1]:
+                        # reward += self.board[i][j]/3
+                        reward += adjacent_sf
+                    # Check if the cell to the right is equal
+                    if j != self.board_size-1 and self.board[i][j] == self.board[i][j+1]:
+                        # reward += self.board[i][j]/3
+                        reward += adjacent_sf
+
+            # 5. If the largest tile is on the edge of the board, double for the corner
+            # side_sf = 50
+            side_sf = 500
+            max_loc = np.argmax(self.board)
+            if (max_loc//self.board_size == 0):                 # Check if we are on the top edge
+                # reward += np.log2(np.max(self.board))*side_sf
+                reward += side_sf
+            if (max_loc//self.board_size == self.board_size-1): # Check if we are on the bottom edge
+                # reward += np.log2(np.max(self.board))*side_sf
+                reward += side_sf
+            if (max_loc%self.board_size == 0):                  # Check if we are on the left edge
+                # reward += np.log2(np.max(self.board))*side_sf
+                reward += side_sf
+            if (max_loc%self.board_size == self.board_size-1):  # Check if we are on the right edge
+                # reward += np.log2(np.max(self.board))*side_sf
+                reward += side_sf
+
+            # 6. The number of adjacent cells that are one away
+            adjacent_sf = 20
+            for i in range(self.board_size):
+                for j in range(self.board_size):
+                    # Check if the cell above is equal
+                    if i != 0 and self.board[i][j]/2 == self.board[i-1][j]:
+                        # reward += self.board[i-1][j]/6
+                        reward += adjacent_sf
+                    # Check if the cell below is equal
+                    if i != self.board_size-1 and self.board[i][j]/2 == self.board[i+1][j]:
+                        # reward += self.board[i+1][j]/6
+                        reward += adjacent_sf
+                    # Check if the cell to the left is equal
+                    if j != 0 and self.board[i][j]/2 == self.board[i][j-1]:
+                        # reward += self.board[i][j-1]/6
+                        reward += adjacent_sf
+                    # Check if the cell to the right is equal
+                    if j != self.board_size-1 and self.board[i][j]/2 == self.board[i][j+1]:
+                        # reward += self.board[i][j+1]/6
+                        reward += adjacent_sf
+                        
         elif self.reward_type == 'duration_and_largest':
             # Just make as many moves as possible
             reward = 0
