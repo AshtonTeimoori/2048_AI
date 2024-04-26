@@ -25,6 +25,7 @@ class Game:
         self.reward_type = reward_type
 
         self.created_val = 0
+        self.created_val_count = 0
 
 
         self.setup()
@@ -48,6 +49,7 @@ class Game:
         self.empty_space_val = self.board_size**2
         self.setup()
         self.created_val = 0
+        self.created_val_count = 0
         
         return self.get_flat_board()
 
@@ -130,6 +132,7 @@ class Game:
         invalid_moves_made = 0
 
         self.created_val = 0
+        self.created_val_count = 0
 
         # Move the piece 
         # Check direction:
@@ -235,6 +238,7 @@ class Game:
                         largest_created_val = new_rowcol[new_index]
                     if not check_only:
                         self.created_val += new_rowcol[new_index]
+                        self.created_val_count += 1
                 else:
                     # New value to put down 
                     new_rowcol[new_index] = cur_rowcol[i]
