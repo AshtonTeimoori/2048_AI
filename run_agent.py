@@ -17,6 +17,14 @@ from model_class import DQN
 class ConvBlock(nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels):
         super(ConvBlock, self).__init__()
+        self.convA = nn.Sequential(
+            nn.Conv2d(in_channels, hidden_channels, kernel_size=3, stride=1, padding='same'),
+            nn.ReLU()
+            )
+        self.convB = nn.Sequential(
+            nn.Conv2d(in_channels, hidden_channels, kernel_size=2, stride=1, padding='same'),
+            nn.ReLU()
+            )
         self.conv_vert = nn.Sequential(
             nn.Conv2d(in_channels, hidden_channels, kernel_size=(1,2), stride=1),
             nn.ReLU()
@@ -75,7 +83,7 @@ output_size = 4  # Assuming there are 4 possible actions (up, down, left, right)
 
 model = NONSQUARE(2048, 256, 4).to(device)
 
-model.load_state_dict(torch.load('C:\\Users\\Ash\\OneDrive\\Documents\\School\\GeorgiaTech\\CS7643_DeepLearning\\Project\\2048_AI\\trained_models\\hs_nonsqure_kernel_policy_policy_weights_episode_1900.pth'))
+model.load_state_dict(torch.load('trained_models\hs_nonsqure_kernel_policy_policy_weights_episode_0300.pth'))
 model.eval()
 
 # Create an instance of the Game class
@@ -87,6 +95,7 @@ iterations = 100
 max_tiles = np.zeros([iterations])
 
 game = Game(np.random.randint(1, 1000), 4, 'hs')
+actions_count = {0:0, 1:0, 2:0, 3:0}
 for epoch in range(iterations):
     game.reset()
     # game.display()
@@ -106,11 +115,12 @@ for epoch in range(iterations):
                 action = actions.argmax().item()
 
         (reward, done, updated, invalid_actions, invalid_moves_made) = game.swipe(action_dict[action])
-        
+        actions_count[action] += 1
         # print(reward)
         
     game.display()
     
+    print(actions_count)
     max_tiles[epoch] = np.max(game.board)
     # print(done)
     # print(action_dict[action])

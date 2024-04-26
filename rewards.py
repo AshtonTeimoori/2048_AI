@@ -25,10 +25,10 @@ def reward_selection(self, updated, largest_created_val):
             reward += np.max(self.board)
 
             # 2. The value of the marges made in the last move
-            reward += self.created_val
+            reward += self.created_val*2
 
             # 3. The number of empty cells on the board
-            reward += len(self.get_avaliable_spaces())*50
+            # reward += len(self.get_avaliable_spaces())*50
 
             # 4. The number of adjacent cells that are equal
             adjacent_sf = 100
