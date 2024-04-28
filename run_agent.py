@@ -17,14 +17,6 @@ from model_class import DQN
 class ConvBlock(nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels):
         super(ConvBlock, self).__init__()
-        self.convA = nn.Sequential(
-            nn.Conv2d(in_channels, hidden_channels, kernel_size=3, stride=1, padding='same'),
-            nn.ReLU()
-            )
-        self.convB = nn.Sequential(
-            nn.Conv2d(in_channels, hidden_channels, kernel_size=2, stride=1, padding='same'),
-            nn.ReLU()
-            )
         self.conv_vert = nn.Sequential(
             nn.Conv2d(in_channels, hidden_channels, kernel_size=(1,2), stride=1),
             nn.ReLU()
@@ -83,7 +75,7 @@ output_size = 4  # Assuming there are 4 possible actions (up, down, left, right)
 
 model = NONSQUARE(2048, 256, 4).to(device)
 
-model.load_state_dict(torch.load('trained_models\hs_nonsqure_kernel_policy_policy_weights_episode_0300.pth'))
+model.load_state_dict(torch.load('backup_trained_models\model_x.pth'))
 model.eval()
 
 # Create an instance of the Game class
@@ -127,8 +119,28 @@ for epoch in range(iterations):
     # print('---------------------')
 # print(game.get_score())
 # print(game.game_duration)
-plt.hist(max_tiles, bins=range(int(np.max(max_tiles))+2))
-plt.xlabel('Max Tiles')
+# plt.hist(max_tiles, bins=range(int(np.max(max_tiles))+2))
+# plt.xlabel('Max Tiles')
+# plt.ylabel('Frequency')
+# plt.title('Distribution of Max Tiles')
+# plt.show()
+
+import matplotlib.pyplot as plt
+
+# Count the frequency of each max_tile value
+max_tile_counts = np.bincount(max_tiles.astype(int))
+max_tile_counts = max_tile_counts[max_tile_counts>0]
+
+unique_max_tiles = np.unique(max_tiles)
+# Create a bar chart
+plt.bar(np.arange(len(unique_max_tiles)), max_tile_counts)
+plt.xticks(np.arange(len(unique_max_tiles)), unique_max_tiles)
+
+# Set the y-axis label
 plt.ylabel('Frequency')
-plt.title('Distribution of Max Tiles')
+
+# Set the title
+plt.title('Frequency of Max Tile')
+
+# Show the plot
 plt.show()

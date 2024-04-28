@@ -8,6 +8,9 @@ class Game:
         self.seed = seed
         random.seed(seed)
         self.largest_value = 0
+        self.largest_value_hold = 2
+        self.largest_value_hold_duration = 0
+        self.reward_vect = []
 
         self.board_size = board_size
         self.board = np.zeros([board_size, board_size], dtype=int)
@@ -36,8 +39,19 @@ class Game:
         random.seed(random.randrange(2**63-1))
         self.board = np.zeros([self.board_size, self.board_size], dtype=int)
         self.previous_board = np.zeros([self.board_size, self.board_size], dtype=int)
+        self.reward_vect = []
+        # if self.largest_value >= self.largest_value_hold:
+        #     self.largest_value_hold_duration += 1
+            
+        # if self.largest_value_hold_duration > 10:
+        #     self.largest_value_hold = 2**(np.log2(self.largest_value_hold) + 1)
+        #     self.largest_value_hold_duration = 0
+        
+        # spot_picker = random.randint(0, self.board_size**2-1)
+        # self.board[spot_picker//self.board_size, spot_picker%self.board_size] = 2**(np.log2(self.largest_value_hold)-1)
+        
         self.largest_value = 0
-
+        
 
         self.prob_4 = 0.1   # Probability that a 4 will spawn
 
@@ -53,6 +67,11 @@ class Game:
         
         return self.get_flat_board()
 
+    def large_value_injection(self, game_duration, largest_value):
+        max = np.log2(largest_value)
+        range = np.arange(max+1)
+    
+    
     def load_board(self, board, game_duration):
         self.board = board
         self.previous_board = np.zeros([self.board_size, self.board_size], dtype=int)
