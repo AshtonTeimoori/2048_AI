@@ -1,6 +1,6 @@
 import numpy as np
 
-def reward_selection(self, updated, largest_created_val):
+def reward_selection(self, updated, largest_created_val=0):
 
         reward = 0
         # Best switchcase python can buy -- help keep things organized
@@ -34,6 +34,8 @@ def reward_selection(self, updated, largest_created_val):
             adjacent_sf = 100
             for i in range(self.board_size):
                 for j in range(self.board_size):
+                    if self.board[i][j] == 0:
+                        continue
                     # Check if the cell above is equal
                     if i != 0 and self.board[i][j] == self.board[i-1][j]:
                         reward += adjacent_sf
@@ -46,6 +48,109 @@ def reward_selection(self, updated, largest_created_val):
                     # Check if the cell to the right is equal
                     if j != self.board_size-1 and self.board[i][j] == self.board[i][j+1]:
                         reward += adjacent_sf
+
+        elif self.reward_type == 'white_mono_corner':
+            # 1. The number of empty cells on the board
+            # 2. The number of monotonically increasing rows and columns (>=)
+            #    - 32->16, since this is 1 off, multiply by 1/1. 32->8 is 2 off, multiply by 1/2
+            # 3. The largest tile on the board is on the edge or in a corner 
+
+            reward = 0
+
+            # 1. The number of empty cells on the board
+            white_space_sf = 1
+            reward += len(self.get_avaliable_spaces())*white_space_sf
+            # print("White space: ", reward)
+
+            # 2. The number of monotonically increasing rows and columns (>=)
+            mono_sf = 10
+
+            # Check rows
+            row_reward = 0.0
+            for i in range(self.board_size):
+                temp_row = 0.0
+                temp_val = 0.0
+                same_tile_reward = 0.0
+                for j in range(self.board_size):
+                    if self.board[i][j] == 0:
+                        continue
+                    # Grab first non-zero value
+                    if temp_val == 0:
+                        temp_val = self.board[i][j]
+                        continue
+                    if np.log2(temp_val) == np.log2(self.board[i][j]):
+                        same_tile_reward += 1.5
+                    else:
+                        temp_row += 1./(np.log2(self.board[i][j]) - np.log2(temp_val))
+                    temp_val = self.board[i][j]
+                row_reward += abs(temp_row) + same_tile_reward
+
+            # Check columns
+            col_reward = 0.0
+            for j in range(self.board_size):
+                temp_col = 0.0
+                temp_val = 0.0
+                same_tile_reward = 0.0
+                for i in range(self.board_size):
+                    if self.board[i][j] == 0:
+                        continue
+                    # Grab first non-zero value
+                    if temp_val == 0:
+                        temp_val = self.board[i][j]
+                        continue
+                    if np.log2(temp_val) == np.log2(self.board[i][j]):
+                        same_tile_reward += 1.5
+                    else:
+                        temp_col += 1./(np.log2(self.board[i][j]) - np.log2(temp_val))
+                    temp_val = self.board[i][j]
+                col_reward += abs(temp_col) + same_tile_reward
+
+            reward += mono_sf*(row_reward + col_reward)
+            # print("Mono-row: ", mono_sf*(row_reward))
+            # print("Mono-col: ", mono_sf*(col_reward))
+
+            # 3. The largest tile on the board is on the edge or in a corner
+            side_sf = 150
+            r3=0
+            max_locs = np.argwhere(self.board == np.amax(self.board))
+            for max_loc in max_locs:
+                if (max_loc[0] == 0 and max_loc[1] == 0): # TL Corner
+                    r3 = 2*side_sf
+                    break
+                elif (max_loc[0] == 0 and max_loc[1] == self.board_size-1): # TR Corner
+                    r3 = 2*side_sf
+                    break
+                elif (max_loc[0] == self.board_size-1 and max_loc[1] == 0): # BL Corner
+                    r3 = 2*side_sf
+                    break
+                elif (max_loc[0] == self.board_size-1 and max_loc[1] == self.board_size-1): # BR Corner
+                    r3 = 2*side_sf
+                    break
+                elif (max_loc[0] == 0):                 # Check if we are on the top edge
+                    # r3 += np.log2(np.max(self.board))*side_sf
+                    r3 = side_sf
+                elif (max_loc[0] == self.board_size-1): # Check if we are on the bottom edge
+                    # r3 += np.log2(np.max(self.board))*side_sf
+                    r3 = side_sf
+                elif (max_loc[1] == 0):                  # Check if we are on the left edge
+                    # r3 += np.log2(np.max(self.board))*side_sf
+                    r3 = side_sf
+                elif (max_loc[1] == self.board_size-1):  # Check if we are on the right edge
+                    # r3 += np.log2(np.max(self.board))*side_sf
+                    r3 = side_sf
+            reward += r3
+            # print("Corner: ", r3)
+
+            # 4. Created max tile
+            r4 = 0
+            if largest_created_val == np.max(np.max(self.board)):
+                r4 = 40
+            # print("Making max tile: ", r4)
+            reward += r4
+                
+            # 5. Combined 
+            r5=self.created_val_count*40
+            reward += r5
 
         elif self.reward_type == 'hs_corner':
             # 1. The largest tile on the board
@@ -61,53 +166,78 @@ def reward_selection(self, updated, largest_created_val):
 
             # # 2. The value of the marges made in the last move
             # reward += self.created_val
-            reward += self.created_val_count*100
-
+            r1=self.created_val_count*100
+            reward += r1
+            # print("#2", reward)
             # # 3. The number of empty cells on the board
             # reward += len(self.get_avaliable_spaces())*50
 
             # 4. The number of adjacent cells that are equal
             adjacent_sf = 50
+            r4=0
             for i in range(self.board_size):
                 for j in range(self.board_size):
+                    if self.board[i][j] == 0:
+                        continue
                     # Check if the cell above is equal
                     if i != 0 and self.board[i][j] == self.board[i-1][j]:
                         # reward += self.board[i][j]/3
-                        reward += adjacent_sf
+                        r4 += adjacent_sf
                     # Check if the cell below is equal
                     if i != self.board_size-1 and self.board[i][j] == self.board[i+1][j]:
-                        # reward += self.board[i][j]/3
-                        reward += adjacent_sf
+                        # r4 += self.board[i][j]/3
+                        r4 += adjacent_sf
                     # Check if the cell to the left is equal
                     if j != 0 and self.board[i][j] == self.board[i][j-1]:
-                        # reward += self.board[i][j]/3
-                        reward += adjacent_sf
+                        # r4 += self.board[i][j]/3
+                        r4 += adjacent_sf
                     # Check if the cell to the right is equal
                     if j != self.board_size-1 and self.board[i][j] == self.board[i][j+1]:
-                        # reward += self.board[i][j]/3
-                        reward += adjacent_sf
+                        # r4 += self.board[i][j]/3
+                        r4 += adjacent_sf
+            reward += r4
+            # print("#4: ", r4)
 
             # 5. If the largest tile is on the edge of the board, double for the corner
             # side_sf = 50
             side_sf = 500
-            max_loc = np.argmax(self.board)
-            if (max_loc//self.board_size == 0):                 # Check if we are on the top edge
-                # reward += np.log2(np.max(self.board))*side_sf
-                reward += side_sf
-            if (max_loc//self.board_size == self.board_size-1): # Check if we are on the bottom edge
-                # reward += np.log2(np.max(self.board))*side_sf
-                reward += side_sf
-            if (max_loc%self.board_size == 0):                  # Check if we are on the left edge
-                # reward += np.log2(np.max(self.board))*side_sf
-                reward += side_sf
-            if (max_loc%self.board_size == self.board_size-1):  # Check if we are on the right edge
-                # reward += np.log2(np.max(self.board))*side_sf
-                reward += side_sf
+            r5=0
+            max_locs = np.argwhere(self.board == np.amax(self.board))
+            for max_loc in max_locs:
+                # r5=0
+                if (max_loc[0] == 0 and max_loc[1] == 0): # TL Corner
+                    r5 = 2*side_sf
+                    break
+                elif (max_loc[0] == 0 and max_loc[1] == self.board_size-1): # TR Corner
+                    r5 = 2*side_sf
+                    break
+                elif (max_loc[0] == self.board_size-1 and max_loc[1] == 0): # BL Corner
+                    r5 = 2*side_sf
+                    break
+                elif (max_loc[0] == self.board_size-1 and max_loc[1] == self.board_size-1): # BR Corner
+                    r5 = 2*side_sf
+                    break
+                elif (max_loc[0] == 0):                 # Check if we are on the top edge
+                    # r5 += np.log2(np.max(self.board))*side_sf
+                    r5 = side_sf
+                elif (max_loc[0] == self.board_size-1): # Check if we are on the bottom edge
+                    # r5 += np.log2(np.max(self.board))*side_sf
+                    r5 = side_sf
+                elif (max_loc[1] == 0):                  # Check if we are on the left edge
+                    # r5 += np.log2(np.max(self.board))*side_sf
+                    r5 = side_sf
+                elif (max_loc[1] == self.board_size-1):  # Check if we are on the right edge
+                    # r5 += np.log2(np.max(self.board))*side_sf
+                    r5 = side_sf
+            reward += r5
+            # print("#5: ", r5)
 
             # 6. The number of adjacent cells that are one away
             adjacent_sf = 20
             for i in range(self.board_size):
                 for j in range(self.board_size):
+                    if self.board[i][j] == 0:
+                        continue
                     # Check if the cell above is equal
                     if i != 0 and self.board[i][j]/2 == self.board[i-1][j]:
                         # reward += self.board[i-1][j]/6
@@ -125,6 +255,13 @@ def reward_selection(self, updated, largest_created_val):
                         # reward += self.board[i][j+1]/6
                         reward += adjacent_sf
                         
+            # 7. Created max tile
+            r6 = 0
+            if largest_created_val == np.max(np.max(self.board)):
+                r6 = 500
+            # print("#6: ", r6)
+            reward += r6
+        
         elif self.reward_type == 'duration_and_largest':
             # Just make as many moves as possible
             reward = 0
