@@ -27,13 +27,17 @@ class Game:
         self.created_val = 0
         self.created_val_count = 0
 
+        self.reward_vect = []
 
         self.setup()
 
     def reset(self):
         
         # random.seed(self.seed)
-        random.seed(random.randrange(2**63-1))
+        if self.seed is not None:
+            random.seed(self.seed)
+        else:
+            random.seed(random.randrange(2**63-1))
         self.board = np.zeros([self.board_size, self.board_size], dtype=int)
         self.previous_board = np.zeros([self.board_size, self.board_size], dtype=int)
         self.largest_value = 0
@@ -50,6 +54,8 @@ class Game:
         self.setup()
         self.created_val = 0
         self.created_val_count = 0
+        
+        self.reward_vect = []
         
         return self.get_flat_board()
 

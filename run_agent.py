@@ -17,42 +17,47 @@ from model_class import DQN
 class ConvBlock(nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels):
         super(ConvBlock, self).__init__()
-        self.conv_vert = nn.Sequential(
-            nn.Conv2d(in_channels, hidden_channels, kernel_size=(1,2), stride=1),
+        self.conv_2x2 = nn.Sequential(
+            nn.Conv2d(in_channels, hidden_channels, kernel_size=2, stride=1),
             nn.ReLU()
             )
-        self.conv_horz = nn.Sequential(
-            nn.Conv2d(in_channels, hidden_channels, kernel_size=(2,1), stride=1),
+        self.conv_3x3 = nn.Sequential(
+            nn.Conv2d(in_channels, hidden_channels, kernel_size=3, stride=1),
             nn.ReLU()
             )
-        self.conv_vert2 = nn.Sequential(
-            nn.Conv2d(hidden_channels, out_channels, kernel_size=(1,2), stride=1),
+        self.conv_4x4 = nn.Sequential(
+            nn.Conv2d(in_channels, hidden_channels, kernel_size=4, stride=1),
             nn.Flatten(),
             nn.ReLU()
             )
-        self.conv_horz2 = nn.Sequential(
-            nn.Conv2d(hidden_channels, out_channels, kernel_size=(2,1), stride=1),
+        self.conv_2x2_w_2x2 = nn.Sequential(
+            nn.Conv2d(hidden_channels, out_channels, kernel_size=2, stride=1),
             nn.Flatten(),
             nn.ReLU()
             )
+        self.conv_3x3_w_2x2 = nn.Sequential(
+            nn.Conv2d(hidden_channels, out_channels, kernel_size=2, stride=1),
+            nn.Flatten(),
+            nn.ReLU()
+            )
+        self.flatten = nn.Flatten()
     
     def forward(self, x):
-        x_vert = self.conv_vert(x)
-        x_horz = self.conv_horz(x)
-        x_vert2vert = self.conv_vert2(x_vert)
-        x_vert2horz = self.conv_horz2(x_vert)
-        x_horz2vert = self.conv_vert2(x_horz)
-        x_horz2horz = self.conv_horz2(x_horz)
-        return torch.cat([x_vert2vert, x_vert2horz, x_horz2vert, x_horz2horz], dim=1)
+        out_1x1xhid = self.conv_4x4(x)
+        hid_2x2xhid = self.conv_3x3(x)
+        hid_3x3xhid = self.conv_2x2(x)
+        out_1x1xout = self.conv_2x2_w_2x2(hid_2x2xhid)
+        out_2x2xout = self.conv_3x3_w_2x2(hid_3x3xhid)
+        return torch.cat([out_1x1xhid, self.flatten(hid_2x2xhid), out_1x1xout, out_2x2xout], dim=1)
 
-class NONSQUARE(nn.Module): # 
+class CNN234(nn.Module): # 
     def __init__(self, HIDDEN_LAYER_1, HIDDEN_LAYER_2, OUTPUT_LAYER):
-        super(NONSQUARE, self).__init__()
+        super(CNN234, self).__init__()
         self.network = nn.Sequential(
             ConvBlock(16, 256, 512),
             nn.ReLU(),
             nn.Flatten(),   # Unnecessary?
-            nn.Linear(17408, HIDDEN_LAYER_1),
+            nn.Linear(3840, HIDDEN_LAYER_1),
             nn.ReLU(),
             nn.Linear(HIDDEN_LAYER_1, HIDDEN_LAYER_2),
             nn.ReLU(),
@@ -73,9 +78,9 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 input_size = 16  # Assuming the input size is 16 for the 4x4 grid of the game
 output_size = 4  # Assuming there are 4 possible actions (up, down, left, right)
 
-model = NONSQUARE(2048, 256, 4).to(device)
+model = CNN234(1024, 256, 4).to(device)
 
-model.load_state_dict(torch.load('C:\\Users\\Ash\\OneDrive\\Documents\\School\\GeorgiaTech\\CS7643_DeepLearning\\Project\\2048_AI\\trained_models\\hs_nonsqure_kernel_policy_policy_weights_episode_1900.pth'))
+model.load_state_dict(torch.load('C:\Users\sudde\Documents\Python\7643\project\2048_AI\trained_models\white_mono_corner_CNN234_seed_policy_policy_weights_episode_0500.pth'))
 model.eval()
 
 # Create an instance of the Game class
